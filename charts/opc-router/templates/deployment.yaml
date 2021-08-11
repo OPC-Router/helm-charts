@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "opc-router.fullname" . }}
+  labels:
+    {{- include "opc-router.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "opc-router.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "opc-router.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "opc-router.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          # livenessProbe:
+          #   httpGet:
+          #     path: /
+          #     port: http
+          # readinessProbe:
+          #   httpGet:
+          #     path: /
+          #     port: http
+          env:
+            - name: OR_DATABASE_CONNECTION_STRING
+              value: "mongodb://root:{{ index (lookup "v1" "Secret" .Release.Namespace "opc-router-mongodb-password").data "mongodb-root-password" | b64dec }}@{{ .Release.Name }}-mongodb-0.{{ .Release.Name }}-mongodb-headless/"
+            # - name: OR_DATABASE_HOST_ADRESS
+            #   value: "{{ .Release.Name }}-mongodb-0.{{ .Release.Name }}-mongodb-headless"
+            - name: OR_DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: opc-router-mongodb-password
+                  key: mongodb-root-password
+            - name: OR_I_ACCEPT_EULA
+              value: "true"
+          {{- if .Values.EnvVars }}
+            {{- include "common.tplvalues.render" (dict "value" .Values.EnvVars "context" $) | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
