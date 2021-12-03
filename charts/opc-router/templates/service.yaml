@@ -8,8 +8,11 @@ spec:
   type: {{ .Values.service.type }}
   ports:
     - port: {{ .Values.service.port }}
-      targetPort: http
+      {{- with .Values.service.nodePort }}
+      nodePort: {{ . }}
+      {{- end }}
+      targetPort: opcrouter
       protocol: TCP
-      name: http
+      name: opcrouter
   selector:
     {{- include "opc-router.selectorLabels" . | nindent 4 }}
