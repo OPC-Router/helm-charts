@@ -70,10 +70,8 @@ https://github.com/helm/charts/issues/5167
 {{- $len := (default 16 .Length) | int -}}
 {{- $obj := (lookup "v1" .Kind .Namespace .Name).data -}}
 {{- if $obj }}
-{{- index $obj .Key -}}
-{{- else if (eq (lower .Kind) "secret") -}}
-{{- randAlphaNum $len | b64enc -}}
+    {{- index (b64dec $obj) .Key -}}
 {{- else -}}
-{{- randAlphaNum $len -}}
+    {{- randAlphaNum $len -}}
 {{- end -}}
 {{- end }}

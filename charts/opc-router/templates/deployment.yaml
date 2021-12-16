@@ -5,7 +5,7 @@ metadata:
   labels:
     {{- include "opc-router.labels" . | nindent 4 }}
 spec:
-  revisionHistoryLimit: {{ .Values.ContainerHistoryLimit }}
+  revisionHistoryLimit: {{ .Values.containerHistoryLimit }}
   replicas: 1
   selector:
     matchLabels:
@@ -27,14 +27,6 @@ spec:
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
-          {{- with .Values.project.auth.ssh_key }}
-          env:
-          - name: PROJECT_SSH_KEY
-            valueFrom:
-              secretKeyRef:
-                name: {{ printf "%s-%s" (include "opc-router.fullname" $) "secret" | trunc 63 | trimSuffix "-" }}
-                key: project-ssh-key
-        {{- end }}
         - name: {{ .Chart.Name }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
@@ -44,30 +36,30 @@ spec:
             - name: opcrouter
               containerPort: 27017
               protocol: TCP
-          # livenessProbe:
-          #   httpGet:
-          #     path: /
-          #     port: http
-          # readinessProbe:
-          #   httpGet:
-          #     path: /
-          #     port: http
           # Environment variables for the opcrouter container
           env:
           # Variables for connecting a service to the mongodb if a service is specified
           {{- if eq .Values.image.repository "opcrouter/service" }}
+          - name: OR_DATABASE_USERNAME
+            value: root
+          - name: OR_DATABASE_HOST_ADRESS
+            value: "{{ .Release.Name }}-mongodb-0.{{ .Release.Name }}-mongodb-headless"
           # Loading the password for the mongodb from secret
           - name: OR_DATABASE_PASSWORD
             valueFrom:
               secretKeyRef:
                 name: {{ .Values.mongodb.auth.existingSecret }}
                 key: mongodb-root-password
-          # Connection string that utilizes the password environment variable
-          - name: OR_DATABASE_CONNECTION_STRING
-            value: "mongodb://root:$(OR_DATABASE_PASSWORD)@{{ .Release.Name }}-mongodb-0.{{ .Release.Name }}-mongodb-headless/"
           {{- end }}
           - name: OR_I_ACCEPT_EULA
             value: {{ .Values.I_do_accept_the_EULA | quote }}
+          {{- if (or .Values.project.auth.ssh_key .Values.project.auth.ssh_secret) }}
+          - name: PROJECT_SSH_KEY
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.project.auth.ssh_secret | default (printf "%s-%s" (include "opc-router.fullname" $) "secret" | trunc 63 | trimSuffix "-") }}
+                key: project-ssh-key
+          {{- end }}
           # Loading environment variables specified in the values file
           {{- range .Values.EnvVars }}
           - name: "{{ keys . | first }}"
@@ -83,29 +75,31 @@ spec:
             name: project-volume
           # Command and arguments for loading the project and configuration into the opcrouter
           command: ["/init", "dotnet", "/app/inray.OPCRouter.Service.dll", "import-project"]
-          args: ["--source","/project/{{ .Values.project.projectPath }}","--configdb","OPCRouterRuntime","--allow-clear-config","--start-service"{{ if .Values.project.configPath }},"--runtime-configuration-filepath","/project/{{ .Values.project.configPath }}"{{ end }}]
+          args: ["--source","/project/{{ .Values.project.projectPath }}",{{ if eq .Values.image.repository "opcrouter/runtime" }}"--configdb","OPCRouterRuntime",{{ end }}"--allow-clear-config","--start-service"{{ if .Values.project.configPath }},"--runtime-configuration-filepath","/project/{{ .Values.project.configPath }}"{{ end }}]
+            
       # Init container for pulling the project files
       initContainers:
       - name: pull-project
         image: alpine/git:latest
         # Script for setting ssh credentials and cloning the repository onto the volume
-        command: ['sh', '-c', "{{ if .Values.project.auth.ssh_key }}mkdir .ssh; cd .ssh; echo -e $PROJECT_SSH_KEY > id; chmod 400 id; eval `ssh-agent`; ssh-add id; ssh -o 'StrictHostKeyChecking=no' github.com; {{ end }}cd /project; git clone {{ .Values.project.projectRepo }} .; echo Done"]
+        command: ['sh', '-c', "{{ if .Values.project.auth.ssh_key }}mkdir .ssh; cd .ssh; echo -e $PROJECT_SSH_KEY > id; chmod 400 id; eval `ssh-agent`; ssh-add id; ssh -o 'StrictHostKeyChecking=no' *; {{ end }}cd /project; git clone {{ .Values.project.projectRepo }} .; echo Done"]
         # Volume mount for the project and configuration file
         volumeMounts:
         - mountPath: /project
           name: project-volume
-        {{- with .Values.project.auth.ssh_key }}
+        {{- if (or .Values.project.auth.ssh_key .Values.project.auth.ssh_secret) }}
         env:
         - name: PROJECT_SSH_KEY
           valueFrom:
             secretKeyRef:
-              name: {{ printf "%s-%s" (include "opc-router.fullname" $) "secret" | trunc 63 | trimSuffix "-" }}
+              name: {{ .Values.project.auth.ssh_secret | default (printf "%s-%s" (include "opc-router.fullname" $) "secret" | trunc 63 | trimSuffix "-") }}
               key: project-ssh-key
         {{- end }}
       # Volume for the project and configuration file
       volumes:
       - name: project-volume
-        emptyDir: {}
+        persistentVolumeClaim:
+          claimName: {{ include "opc-router.fullname" . }}
           {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
