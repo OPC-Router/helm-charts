@@ -1,3 +1,6 @@
+{{- if eq .Values.image.repository "opcrouter/runtime" }}
+{{- if eq .Values.mongodb.deploy false}}
+{{- if .Values.mongodb.externalAccess.enabled }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -5,10 +8,10 @@ metadata:
   labels:
     {{- include "opc-router.labels" . | nindent 4 }}
 spec:
-  type: {{ .Values.service.type }}
+  type: {{ .Values.mongodb.externalAccess.service.type }}
   ports:
-    - port: {{ .Values.service.port }}
-      {{- with .Values.service.nodePort }}
+    - port: {{ .Values.mongodb.externalAccess.service.port }}
+      {{- with first .Values.mongodb.externalAccess.service.nodePorts }}
       nodePort: {{ . }}
       {{- end }}
       targetPort: opcrouter
@@ -16,3 +19,6 @@ spec:
       name: opcrouter
   selector:
     {{- include "opc-router.selectorLabels" . | nindent 4 }}
+{{- end }}
+{{- end }}
+{{- end }}

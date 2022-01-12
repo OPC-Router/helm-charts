@@ -24,3 +24,29 @@ Commands to clone the project repo
   git clone {{ .Values.project.projectRepo }} /data/project;
   echo Done;
 {{- end }}
+
+{{/*
+Commands to continuously update the project and restart the pod on new version
+*/}} 
+{{- define "project.gitops" }}
+{{- include "project.ssh" $}}
+  apk add curl; 
+  cat <<EOF > ~/gitops.sh
+    cd /data/project;
+    while [ true ]; do
+      sleep 60;
+      {{- if (or $.Values.project.auth.ssh_key $.Values.project.auth.ssh_secret) }}
+      eval \`ssh-agent\`;
+      ssh-add ~/.ssh/id;
+      {{- end }}
+      git fetch;
+      if [ \$(git rev-parse HEAD) != \$(git rev-parse @{u}) ]; then
+        git pull;
+        curl -XDELETE http://localhost:8001/api/v1/namespaces/{{ .Release.Namespace }}/pods?labelSelector=app.kubernetes.io/name={{ .Chart.Name }};
+      fi
+    done
+  EOF
+
+  chmod 777 ~/gitops.sh;
+  ~/gitops.sh;
+ {{- end }}

@@ -33,17 +33,22 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
+          {{- if eq .Values.image.repository "opcrouter/runtime" }}
+          {{- if eq .Values.mongodb.deploy false }}
             - name: opcrouter
               containerPort: 27017
               protocol: TCP
+          {{- end }}
+          {{- end }}
           # Environment variables for the opcrouter container
           env:
           # Variables for connecting a service to the mongodb if a service is specified
-          {{- if eq .Values.image.repository "opcrouter/service" }}
-          - name: OR_DATABASE_USERNAME
-            value: root
+          {{- if .Values.mongodb.deploy }}
           - name: OR_DATABASE_HOST_ADRESS
             value: "{{ .Release.Name }}-mongodb-0.{{ .Release.Name }}-mongodb-headless"
+          {{- if .Values.mongodb.auth.enabled }}
+          - name: OR_DATABASE_USERNAME
+            value: root
           # Loading the password for the mongodb from secret
           - name: OR_DATABASE_PASSWORD
             valueFrom:
@@ -51,6 +56,7 @@ spec:
                 name: {{ .Values.mongodb.auth.existingSecret }}
                 key: mongodb-root-password
           {{- end }}
+          {{- end }} 
           - name: OR_I_ACCEPT_EULA
             value: {{ .Values.I_do_accept_the_EULA | quote }}
           # Loading environment variables specified in the values file
@@ -60,9 +66,9 @@ spec:
           {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-          # Project repo is specified: Get and load project
-          {{- if .Values.project.projectRepo }}
-          # Volume mount for the project and configuration file
+      {{- if .Values.project.projectRepo }}
+      # Project repo is specified: Get and load project
+      # Volume mount for the project and configuration file
           volumeMounts:
           - mountPath: /data
             name: project-volume
@@ -72,8 +78,10 @@ spec:
             - "--source"
             - "/data/project/{{ .Values.project.projectPath }}"
             {{- if eq .Values.image.repository "opcrouter/runtime" }}
+            {{- if eq .Values.mongodb.deploy false }}
             - "--configdb"
             - "OPCRouterRuntime"
+            {{- end }}
             {{- end }}
             - "--allow-clear-config"
             - "--start-service"
@@ -81,6 +89,31 @@ spec:
             - "--runtime-configuration-filepath"
             - "/data/project/{{ .Values.project.configPath }}"
             {{- end }}
+        {{- if .Values.project.autoUpdate }}
+        - name: kubernetes-proxy
+          image: bitnami/kubectl:latest
+          # Script for setting ssh credentials and cloning the repository onto the volume
+          command: ['sh', '-c', "kubectl proxy;"]
+        - name: git-ops
+          image: alpine/git:latest
+          # Script for setting ssh credentials and cloning the repository onto the volume
+          command: ["sh", "-c"]
+          args:
+          - >-
+            {{- include "project.gitops" $ | indent 12}}
+          # Volume mount for the project and configuration file
+          volumeMounts:
+          - mountPath: /data
+            name: project-volume
+          {{- if (or .Values.project.auth.ssh_key .Values.project.auth.ssh_secret) }}
+          env:
+          - name: PROJECT_SSH_KEY
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.project.auth.ssh_secret | default (printf "%s-%s" (include "opc-router.fullname" $) "secret" | trunc 63 | trimSuffix "-") }}
+                key: project-ssh-key
+          {{- end }}
+        {{- end }}
       # Init container for pulling the project files
       initContainers:
       - name: pull-project
@@ -105,9 +138,13 @@ spec:
       # Volume for the project and configuration file
       volumes:
       - name: project-volume
+      {{- if .Values.project.persistantVolume.deploy }}
         persistentVolumeClaim:
           claimName: {{ include "opc-router.fullname" . }}
-          {{- end }}
+      {{- else}}
+        emptyDir: {}
+      {{- end }}
+      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

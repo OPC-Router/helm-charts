@@ -1,3 +1,4 @@
+{{- if .Values.project.persistantVolume.deploy }}
 apiVersion: v1
 kind: PersistentVolume
 metadata:
@@ -7,7 +8,7 @@ metadata:
 spec:
   storageClassName: manual
   capacity: 
-    storage: 10Gi
+    storage: {{ .Values.project.persistantVolume.size }}
   accessModes:
     - ReadWriteMany
   hostPath:
@@ -15,3 +16,4 @@ spec:
   claimRef:
     name: {{ include "opc-router.fullname" . }}
     namespace: {{ .Release.Namespace }}
+{{- end }}
