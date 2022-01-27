@@ -5,12 +5,13 @@ metadata:
   name: {{ include "opc-router.fullname" . }}
   labels:
     type: local
+    {{- include "opc-router.labels" . | nindent 4 }}
 spec:
-  storageClassName: manual
+  storageClassName: standard
   capacity: 
     storage: {{ .Values.project.persistantVolume.size }}
   accessModes:
-    - ReadWriteMany
+    - ReadWriteOnce
   hostPath:
     path: "/volume"
   claimRef:

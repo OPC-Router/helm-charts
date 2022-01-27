@@ -1,7 +1,8 @@
+{{- if .Values.project.redundancy.deploy }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "opc-router.fullname" . }}
+  name: {{ include "opc-router.redundancy.fullname" . }}
   labels:
     {{- include "opc-router.labels" . | nindent 4 }}
 spec:
@@ -9,8 +10,8 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      {{- include "opc-router.labels" . | nindent 6 }}
-      {{- include "opc-router.originalSelectorLabels" . | nindent 6 }}
+      {{- include "opc-router.labels" . | nindent 8 }}
+      {{- include "opc-router.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       {{- with .Values.podAnnotations }}
@@ -19,12 +20,7 @@ spec:
       {{- end }}
       labels:
         {{- include "opc-router.labels" . | nindent 8 }}
-        {{- include "opc-router.originalSelectorLabels" . | nindent 8 }}
-        {{- if eq .Values.image.repository "opcrouter/runtime" }}
-        {{- if not .Values.mongodb.deploy }}
         {{- include "opc-router.selectorLabels" . | nindent 8 }}
-        {{- end }}
-        {{- end }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
@@ -37,43 +33,27 @@ spec:
         - name: {{ .Chart.Name }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          image: "opcrouter/runtime:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
-            {{- if eq .Values.image.repository "opcrouter/runtime" }}
-            {{- if not .Values.mongodb.deploy }}
-            - name: mongodb
-              containerPort: 27017
-              protocol: TCP
-            {{- end }}
-            {{- end }}
-            {{- if .Values.project.redundancy.deploy }}
             - name: ready
               containerPort: 49954
               protocol: TCP
+            - name: mongodb
+              containerPort: 27017
+              protocol: TCP
+          # startupProbe:
+          #   httpGet:
+          #     path: /
+          #     port: opcrouter
           readinessProbe:
             tcpSocket:
               port: ready
             initialDelaySeconds: {{ .Values.project.redundancy.readinessProbe.initialDelaySeconds }}
-            periodSeconds: {{ .Values.project.redundancy.readinessProbe.periodSeconds }}
-            {{- end }}
+            periodSeconds: {{ .Values.project.redundancy.readinessProbe.periodSeconds}}
           # Environment variables for the opcrouter container
           env:
           # Variables for connecting a service to the mongodb if a service is specified
-          {{- if .Values.mongodb.deploy }}
-          - name: OR_DATABASE_HOST_ADRESS
-            value: "{{ include "getMongoDB" . }}" 
-          {{- if .Values.mongodb.auth.enabled }}
-          - name: OR_DATABASE_USERNAME
-            value: root
-          # Loading the password for the mongodb from secret
-          - name: OR_DATABASE_PASSWORD
-            valueFrom:
-              secretKeyRef:
-                name: {{ if .Values.mongodb.auth.existingSecret }}{{ .Values.mongodb.auth.existingSecret }}{{ else }}{{ .Release.Name }}-mongodb{{ end }}
-                key: mongodb-root-password
-          {{- end }}
-          {{- end }} 
           - name: OR_I_ACCEPT_EULA
             value: {{ .Values.I_do_accept_the_EULA | quote }}
           # Loading environment variables specified in the values file
@@ -88,23 +68,19 @@ spec:
       # Volume mount for the project and configuration file
           volumeMounts:
           - mountPath: /data
-            name: project-volume
+            name: redundancy-volume
           # Command and arguments for loading the project and configuration into the opcrouter
           command: ["/init", "dotnet", "/app/inray.OPCRouter.Service.dll", "import-project"]
           args: 
             - "--source"
             - "/data/project/{{ .Values.project.projectPath }}"
-            {{- if eq .Values.image.repository "opcrouter/runtime" }}
-            {{- if eq .Values.mongodb.deploy false }}
             - "--configdb"
             - "OPCRouterRuntime"
-            {{- end }}
-            {{- end }}
             - "--allow-clear-config"
             - "--start-service"
             {{- if .Values.project.configPath }}
             - "--runtime-configuration-filepath"
-            - "/data/project/{{ .Values.project.configPath }}"
+            - "/data/redundancyconfig.yaml"
             {{- end }}
         {{- if .Values.project.autoUpdate }}
         - name: kubernetes-proxy
@@ -121,7 +97,7 @@ spec:
           # Volume mount for the project and configuration file
           volumeMounts:
           - mountPath: /data
-            name: project-volume
+            name: redundancy-volume
           {{- if (or .Values.project.auth.ssh_key .Values.project.auth.ssh_secret) }}
           env:
           - name: PROJECT_SSH_KEY
@@ -139,11 +115,11 @@ spec:
         command: ["sh", "-c"]
         args:
           - >-
-          {{- include "project.clone" $ | indent 10}}
+          {{- include "project.redundant.clone" $ | indent 10}}
         # Volume mount for the project and configuration file
         volumeMounts:
         - mountPath: /data
-          name: project-volume
+          name: redundancy-volume
         {{- if (or .Values.project.auth.ssh_key .Values.project.auth.ssh_secret) }}
         env:
         - name: PROJECT_SSH_KEY
@@ -154,11 +130,11 @@ spec:
         {{- end }}
       # Volume for the project and configuration file
       volumes:
-      - name: project-volume
-      {{- if .Values.project.persistantVolume.deploy }}
+      - name: redundancy-volume
+      {{- if .Values.project.redundancy.persistantVolume.deploy }}
         persistentVolumeClaim:
-          claimName: {{ include "opc-router.fullname" . }}
-      {{- else}}
+          claimName: {{ include "opc-router.redundancy.fullname" . }}
+      {{- else }}
         emptyDir: {}
       {{- end }}
       {{- end }}
@@ -174,3 +150,4 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+{{- end }}

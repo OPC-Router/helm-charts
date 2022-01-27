@@ -11,5 +11,5 @@ spec:
     - name: wget
       image: busybox
       command: ['wget']
-      args: ['{{ include "opc-router.fullname" . }}:{{ .Values.mongodb.externalAccess.service.port }}']
+      args: ['{{ include "opc-router.fullname" . }}:{{ .Values.service.port }}']
   restartPolicy: Never

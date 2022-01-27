@@ -26,6 +26,29 @@ Commands to clone the project repo
 {{- end }}
 
 {{/*
+Commands to clone the project repo and edit config to create a redundancy server
+*/}}
+{{- define "project.redundant.clone" }}
+  {{- include "project.clone" $}}  
+  cat <<EOF > /data/redundancyconfig.yaml
+
+  ---
+  
+  routeroptions:
+    RedundancyMasterHostname: {{ include "opc-router.redundancy.fullname" . }}
+    RedundancyPingInterval: {{ .Values.project.redundancy.pingInterval }}
+    RedundancyReconnectCheckPeriod: {{ .Values.project.redundancy.reconnectCheckPeriod }}
+  EOF
+  {{ with .Values.project.configPath }}
+  if [ "$(tail -n+2 /data/project/{{ . }} | head -n 1)" = "routeroptions:" ]; then
+    tail -n+3 /data/project/{{ . }} >> /data/redundancyconfig.yaml
+  else 
+    tail -n+2 /data/project/{{ . }} >> /data/redundancyconfig.yaml
+  fi
+  {{- end }}
+{{- end }}
+
+{{/*
 Commands to continuously update the project and restart the pod on new version
 */}} 
 {{- define "project.gitops" }}

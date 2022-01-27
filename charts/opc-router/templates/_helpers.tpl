@@ -23,6 +23,10 @@ If release name contains chart name it will be used as a full name.
 {{- end }}
 {{- end }}
 
+{{- define "opc-router.redundancy.fullname" -}}
+{{- include "opc-router.fullname" . | cat "redundant" | replace " " "-" | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
 {{/*
 Create chart name and version as used by the chart label.
 */}}
@@ -35,7 +39,8 @@ Common labels
 */}}
 {{- define "opc-router.labels" -}}
 helm.sh/chart: {{ include "opc-router.chart" . }}
-{{ include "opc-router.selectorLabels" . }}
+app.kubernetes.io/name: {{ include "opc-router.name" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
@@ -46,8 +51,15 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 Selector labels
 */}}
 {{- define "opc-router.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "opc-router.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
+statefulset.kubernetes.io/pod-name: {{ .Release.Name }}-mongodb-0
+{{- end }}
+
+{{/*
+Original selector labels
+*/}}
+{{- define "opc-router.originalSelectorLabels" -}}
+originForRedundency: {{ include "opc-router.redundancy.fullname" . }}
 {{- end }}
 
 {{/*
@@ -62,16 +74,14 @@ Create the name of the service account to use
 {{- end }}
 
 {{/*
-Returns a secret if it already in Kubernetes, otherwise it creates
-it randomly.
-https://github.com/helm/charts/issues/5167
+Create the connection string for the mongodb(s)
 */}}
-{{- define "getOrGeneratePass" }}
-{{- $len := (default 16 .Length) | int -}}
-{{- $obj := (lookup "v1" .Kind .Namespace .Name).data -}}
-{{- if $obj }}
-    {{- index (b64dec $obj) .Key -}}
-{{- else -}}
-    {{- randAlphaNum $len -}}
+{{- define "getMongoDB" }}
+{{- $addresses := int .Values.mongodb.replicaCount | until }}
+{{- range $addresses -}}
+{{- if (ne . 0) -}}
+,
 {{- end -}}
+{{ $.Release.Name }}-mongodb-{{ . }}.{{ $.Release.Name }}-mongodb-headless
+{{- end }}
 {{- end }}

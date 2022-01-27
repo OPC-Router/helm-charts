@@ -1,0 +1,22 @@
+{{- if .Values.project.redundancy.deploy }}
+{{- if .Values.project.redundancy.persistantVolume.deploy }}
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ include "opc-router.redundancy.fullname" . }}
+  labels:
+    type: local
+    {{- include "opc-router.labels" . | nindent 4 }}
+spec:
+  storageClassName: standard
+  capacity: 
+    storage: {{ .Values.project.redundancy.persistantVolume.size }}
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/volume"
+  claimRef:
+    name: {{ include "opc-router.redundancy.fullname" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}
+{{- end }}
