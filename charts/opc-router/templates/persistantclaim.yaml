@@ -1,0 +1,15 @@
+{{- if .Values.project.persistantVolume.deploy }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "opc-router.fullname" . }}
+  labels:
+    {{- include "opc-router.labels" . | nindent 4 }}
+spec:
+  storageClassName: standard
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.project.persistantVolume.size }}
+{{- end }}

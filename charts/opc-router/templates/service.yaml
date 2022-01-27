@@ -1,0 +1,20 @@
+{{- if .Values.service.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "opc-router.fullname" . }}
+  labels:
+    {{- include "opc-router.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      {{- with .Values.service.nodePort }}
+      nodePort: {{ . }}
+      {{- end }}
+      targetPort: mongodb
+      protocol: TCP
+      name: mongodb
+  selector:
+    {{- include "opc-router.selectorLabels" . | nindent 4 }}
+{{- end }}

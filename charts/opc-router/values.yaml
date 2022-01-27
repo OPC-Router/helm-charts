@@ -1,0 +1,168 @@
+# Default values for opc-router.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+image:
+  # Image for the opc router container
+  # Has to be either "opcrouter/runtime" for the integrated database
+  # or "opcrouter/service", which utilizes the external mongodb
+  repository: opcrouter/service
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag:
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+# Add environment variables for the opc router here.
+# These will be able to insert themself into the config file for example.
+# Have to be added to the list in the following format: 
+#  Key: "Value"
+# Example:
+# envVars: [
+#   Test: "This"
+#   Other: "true"
+# ]
+envVars: []
+
+mongodb:
+  # When true, an external mongodb will be deployed which the opcrouter will use.
+  # Required to be true when using the opcrouter/service image, as it doesn't have a integrated database.
+  deploy: true
+  # Number of deployed mongodb pods. Should be at 1 except when utilizing a replica twin, then set to 2.
+  replicaCount: 1
+  architecture: replicaset
+  replicaSetName: rs0
+  directoryPerDB: true
+  arbiter:
+    enabled: false
+  auth:
+    # Disables authentification for the mongodb when set to false.
+    enabled: false
+    # Existing secret for keys for the mongodb.
+    existingSecret:
+    # Set a password for the root account. Will overwrite existing secret.
+    rootPassword:
+    # Set a replica set key for the mongodb. Will overwrite existing secret.
+    replicaSetKey:
+    # If no secret or password is provided, mongodb will autogenerate these.
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+
+service:
+  enabled: true
+  # Type of the service. Possible values: ClusterIP, NodePort, LoadBalancer
+  # ClusterIP is the default and means no outside access without port forwarding.
+  # NodePort allows outside access on a random or specific (nodePort) Port.
+  type: ClusterIP
+  # Internal port. The service will be reachable under this port inside the cluster.
+  port: 27017
+  # External port. When NodePort, these ports will allow external access to the service.
+  # When list left blank, NodePort will chose a random port itself.
+  # nodePort need to be in range 30000 to 32768.
+  nodePort:
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: chart-example.local
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls: []
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - chart-example.local
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# The size of the history of deployments kept for potential rollbacks.
+containerHistoryLimit: 10
+
+# Switching this to to true represents accepting the terms and conditions of the end user license agreement.
+# If this is false the opc router container won't be able to run.
+# https://www.opc-router.com/terms-of-use-and-eula/
+I_do_accept_the_EULA: false
+
+project:
+  # URL to git repository of the opcrouter4 project. Optional. Can be left empty, resulting in no project being loaded.
+  projectRepo:
+  # Path to the project .rpe file in the repository. Don't begin with '/'. Optional. Can be left out if no projectRepo is provided. 
+  projectPath:
+  # Path to the projects configuration file. Optional. Not providing it results in no configuration file being loaded.
+  configPath:
+  # If true, the project will be automatically updated when it changes in the repository. Experimental.
+  autoUpdate: false
+  persistantVolume:
+    # Deploy a persistant storage volume for the opcrouter project and runtime database. When false, a non-persistant volume is used.
+    deploy: true
+    # Size of the persistant storage volume. Default 3Gi.
+    size: 3Gi
+  auth:
+    # An existing secret containing the ssh-key under the key 'project-ssh-key'. Optional.
+    # Must be in the same namespace as this application. Takes priority over ssh_key.
+    ssh_secret:
+    # SSH private key for accessing the git repository. Optional.
+    # Line breaks must be represented by '\n'
+    ssh_key:
+    # If false, the ssh key won't be saved on the cluster and will be deleted from the cluster.
+    safe_key: true
+  redundancy:
+    # If true, a redundancy twin of the opcrouter deployment is deployed.
+    # The twin will be configured like the original, but will only run activly and be reachable when the original is down.
+    # When deploying the mongodb pod, mongodb.replicaCount should be set to 2, so the redundancy twin also can connect to a database.  
+    deploy: false
+    pingInterval: 60000
+    reconnectCheckPeriod: 60000
+    readinessProbe:
+      # Time before the readness probe starts checking for container in seconds.
+      initialDelaySeconds: 20
+      # Interval at which the container will be probed in seconds. Lower means faster.
+      periodSeconds: 2
+    persistantVolume:
+      # Deploy a persistant storage volume for the redundAncy twin. When false, a non-persistant volume is used.
+      deploy: true
+      # Size of the persistant storage volume. Default 3Gi.
+      size: 3Gi
