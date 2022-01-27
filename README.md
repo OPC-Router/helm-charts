@@ -1,5 +1,5 @@
 <div align="center">
-  <a href="https://opc-router.com/?utm_source=GitHub&utm_medium=DockerSample&utm_campaign=OpcUaUmatiMssqlGrafana">
+  <a href="https://opc-router.com/?utm_source=GitHub&utm_medium=HelmChart&utm_campaign=OpcRouterChart">
     <img src="img/opc_router_logo.png" alt="Logo" >
   </a>
     <br />
@@ -56,16 +56,27 @@
 - Helm 3.1.0
 
 ## **Installation**
+[Helm](https://helm.sh) must be installed to use the charts.  Please refer to
+Helm's [documentation](https://helm.sh/docs) to get started.
+
+Once Helm has been set up correctly, add the repo as follows:
+```shell
+helm repo add opc-router https://opc-router.github.io/helm-charts
+```
+If you had already added this repo earlier, run `helm repo update` to retrieve
+the latest versions of the packages.  You can then run `helm search repo
+<alias>` to see the charts.
+
 To install the chart with the name `my-opcrouter`:
 ```shell
-$ helm install my-opcrouter <Hier Pfad einfügen> \
+helm install my-opcrouter opc-router/opc-router \
   --set I_do_accept_the_EULA=true
 ```
 This command will install the opc router with standard settings, as a service with a seperate mongodb container. The mongodb won't require authentification, which is not recommended. Accepting the [End User License Agreement](https://www.opc-router.com/terms-of-use-and-eula/) by setting `I_do_accept_the_EULA` to true is required for the OPCRouter to run.
 
 To deploy this chart with password authetification use this command:
 ```shell
-$ helm install my-opcrouter <Hier Pfad einfügen> \
+helm install my-opcrouter opc-router/opc-router \
   --set mongodb.auth.enabled=true \
   --set mongodb.auth.rootPassword=<Your desired root password> \
   --set mongodb.auth.replicaSetKey=<Your desired replicaset key> \
@@ -76,7 +87,7 @@ Keep in mind that the root password and replicaset key can't be changed once set
 ## **Uninstalling**
 The chart with the name `my-opcrouter` can simply be uninstalled by executing:
 ```shell
-$ helm uninstall my-opcrouter
+helm uninstall my-opcrouter
 ```
 However, keep in mind that the persitant volumes of the mongodb container don't get deleted by this. When reinstalling the chart under the same name you will have to use the previous mongodb root password and replica set key or delete the persistant volume beforehand.
 
@@ -161,7 +172,7 @@ envVars:
 ```
 A helm install command can also be issued with specifiying multiple environment variables:
 ```shell
-$ helm install my-opcrouter <Hier Pfad einfügen> \
+$ helm install my-opcrouter opc-router/opc-router \
   --set envVars[0].TESTVAR="successful" \
   --set envVars[1].OtherVariable=42 \
   --set envVars[2].yetAnotherVar=false \
