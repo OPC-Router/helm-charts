@@ -83,6 +83,13 @@ service:
   # When list left blank, NodePort will chose a random port itself.
   # nodePort need to be in range 30000 to 32768.
   nodePort:
+  # External IPs. The serice will be reachable under these IPs from outside the cluser,
+  # when traffic ingresses into the cluster with the IPs as destination.
+  externalIPs: []
+  # LoadBalancer IP. Only used when LoadBalancer.
+  # Used by some cloud providers to add external load balancers.
+  # If not supported, it is just ignored.
+  loadBalancerIP:
 
 ingress:
   enabled: false

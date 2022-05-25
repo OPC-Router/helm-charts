@@ -119,7 +119,7 @@ However, keep in mind that the persitant volumes of the mongodb container don't 
 | `image.repository`                | OPC-Router image registry.                                                                              | `opcrouter/service` |
 | `image.tag`                       | OPC-Router image tag (immutable tags are recommended).                                                  | `""`                |
 | `image.pullPolicy`                | OPC-Router image pull policy.                                                                           | `IfNotPresent`      |
-| `envVars`                         | Array of environment variables for the opc router container.                                            | `[]]`               |
+| `envVars`                         | Array of environment variables for the opc router container.                                            | `[]`               |
 | `serviceAccount.create`           | Specifies whether a service account should be created.                                                  | `true`              |
 | `serviceAccount.annotations`      | Annotations to add to the service account.                                                              | `{}`                |
 | `serviceAccount.name`             | Name of the service account to use. If not set and create is true, it is generated using the fullname.  | `""`                |
@@ -142,6 +142,8 @@ However, keep in mind that the persitant volumes of the mongodb container don't 
 | `service.type`                    | Type of the service. Possible values: ClusterIP, NodePort, LoadBalancer.                                | `ClusterIP`         |
 | `service.port`                    | Internal port. The service will be reachable under this port inside the cluster.                        | `27017`             |
 | `service.nodePort`                | External port. When NodePort, this port will allow external access to the service.                      | `""`                |
+| `service.externalIPs`             | External IPs. Reachable under these IPs, when traffic ingresses into cluster with IPs as destination.   | `[]`                |
+| `service.loadBalancerIP`          | LoadBalancer IP. Used by some cloud providers to add external load balancers.                           | `""`                |
 
 ## **WARNING: MongoDB root password and replica key set**
 
