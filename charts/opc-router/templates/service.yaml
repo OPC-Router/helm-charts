@@ -15,6 +15,13 @@ spec:
       targetPort: mongodb
       protocol: TCP
       name: mongodb
+  {{- with .Values.service.externalIPs }}
+  externalIPs:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.service.loadBalancerIP }}
+  loadBalancerIP: {{ . }}
+  {{- end }}
   selector:
     {{- include "opc-router.selectorLabels" . | nindent 4 }}
 {{- end }}
