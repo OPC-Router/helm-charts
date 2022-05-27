@@ -3,6 +3,21 @@ entries:
   opc-router:
   - apiVersion: v2
     appVersion: "4.27"
+    created: "2022-05-27T20:51:48.678209697Z"
+    dependencies:
+    - condition: mongodb.deploy
+      name: mongodb
+      repository: https://charts.bitnami.com/bitnami
+      version: ~10.x
+    description: A Helm chart for Kubernetes
+    digest: 390f03a02fb9be9765755a4f9a1ab7980d245a7cd3c50b167c71b5b9bc7f0524
+    name: opc-router
+    type: application
+    urls:
+    - https://github.com/OPC-Router/helm-charts/releases/download/opc-router-0.1.3/opc-router-0.1.3.tgz
+    version: 0.1.3
+  - apiVersion: v2
+    appVersion: "4.27"
     created: "2022-05-27T19:44:24.395080014Z"
     dependencies:
     - condition: mongodb.deploy
@@ -46,4 +61,4 @@ entries:
     urls:
     - https://github.com/OPC-Router/helm-charts/releases/download/opc-router-0.1.0/opc-router-0.1.0.tgz
     version: 0.1.0
-generated: "2022-05-27T19:44:24.395103114Z"
+generated: "2022-05-27T20:51:48.678235799Z"
