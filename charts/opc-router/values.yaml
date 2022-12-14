@@ -9,7 +9,7 @@ image:
   repository: opcrouter/service
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: 4.27
+  tag:
 
 imagePullSecrets: []
 nameOverride: ""
@@ -83,13 +83,40 @@ service:
   # When list left blank, NodePort will chose a random port itself.
   # nodePort need to be in range 30000 to 32768.
   nodePort:
-  # External IPs. The serice will be reachable under these IPs from outside the cluser,
+  # External IPs. The service will be reachable under these IPs from outside the cluser,
   # when traffic ingresses into the cluster with the IPs as destination.
   externalIPs: []
   # LoadBalancer IP. Only used when LoadBalancer.
   # Used by some cloud providers to add external load balancers.
   # If not supported, it is just ignored.
   loadBalancerIP:
+  # Annotations for service. 
+  # Some cloud providers may need special annotations for their loadbalancers to work.
+  annotations: {}
+
+license:
+  # Storage capacity of license volume claim.
+  capacity: "100M"
+  # Storage class name of license volume claim.
+  # If left as empty, will use default storage class, when availible.
+  storageClassName:
+  # If true, the license volume claim and volume will persist even after uninstalling the chart.
+  keepAfterUninstall: false
+  storageVolume:
+    # If true, a new persistant volume is created for the license using the settings provided here.
+    # When false, dynamic provisioning might still create a volume using the setting specified by the storageClass. 
+    createVolume: false
+    # Persistant volume retain policy of license volume.
+    reclaimPolicy: Retain
+    # Volume type of license volume.
+    volumeType: local
+    # Volume type specific settings.
+    volumeTypeOptions: 
+      path: /license
+    # Mount options of license volume.
+    mountOptions: []
+    # Node affinity settings of license volume.
+    nodeAffinity: {}
 
 ingress:
   enabled: false

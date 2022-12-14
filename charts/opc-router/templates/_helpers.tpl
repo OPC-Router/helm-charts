@@ -27,6 +27,10 @@ If release name contains chart name it will be used as a full name.
 {{- include "opc-router.fullname" . | cat "redundant" | replace " " "-" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
+{{- define "opc-router.license.fullname" -}}
+{{- include "opc-router.fullname" . | cat "license" | replace " " "-" | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
 {{/*
 Create chart name and version as used by the chart label.
 */}}

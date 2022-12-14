@@ -83,10 +83,13 @@ spec:
           {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+          # Volume mount for license
+          volumeMounts:
+          - mountPath: /root/.dotnet/corefx/cryptography/x509stores/
+            name: license-volume
       {{- if .Values.project.projectRepo }}
       # Project repo is specified: Get and load project
       # Volume mount for the project and configuration file
-          volumeMounts:
           - mountPath: /data
             name: project-volume
           # Command and arguments for loading the project and configuration into the opcrouter
@@ -152,8 +155,13 @@ spec:
               name: {{ .Values.project.auth.ssh_secret | default (printf "%s-%s" (include "opc-router.fullname" $) "secret" | trunc 63 | trimSuffix "-") }}
               key: project-ssh-key
         {{- end }}
+      {{- end }}
       # Volume for the project and configuration file
       volumes:
+      - name: license-volume
+        persistentVolumeClaim:
+          claimName: {{ include "opc-router.license.fullname" . }}
+      {{- if .Values.project.projectRepo }}
       - name: project-volume
       {{- if .Values.project.persistantVolume.deploy }}
         persistentVolumeClaim:

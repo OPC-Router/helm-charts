@@ -1,4 +1,5 @@
 {{- if .Values.project.persistantVolume.deploy }}
+{{- if .Values.project.projectRepo }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -12,4 +13,5 @@ spec:
   resources:
     requests:
       storage: {{ .Values.project.persistantVolume.size }}
+{{- end }}
 {{- end }}
