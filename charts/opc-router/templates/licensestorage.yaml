@@ -1,0 +1,29 @@
+{{- if .Values.license.storageVolume.createVolume }}
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ include "opc-router.license.fullname" . }}
+  labels:
+    type: local
+    {{- include "opc-router.labels" . | nindent 4 }}
+spec:
+  {{- with .Values.license.storageClassName }}
+  storageClassName: {{ . }}
+  {{- end }}
+  capacity: 
+    storage: {{ .Values.license.capacity }}
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: {{ .Values.license.storageVolume.reclaimPolicy }}
+  {{ .Values.license.storageVolume.volumeType }}:
+  {{- with .Values.license.storageVolume.volumeTypeOptions }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  claimRef:
+    name: {{ include "opc-router.license.fullname" . }}
+    namespace: {{ .Release.Namespace }}
+{{- with .Values.license.storageVolume.nodeAffinity }}
+  nodeAffinity:
+    {{- toYaml . | nindent 4 }}
+{{- end }}
+{{- end }}
