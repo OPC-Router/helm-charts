@@ -101,7 +101,7 @@ license:
   # If left as empty, will use default storage class, when availible.
   storageClassName:
   # If true, the license volume claim and volume will persist even after uninstalling the chart.
-  keepAfterUninstall: true
+  keepAfterUninstall: false
   storageVolume:
     # If true, a new persistant volume is created for the license using the settings provided here.
     # When false, dynamic provisioning might still create a volume using the setting specified by the storageClass. 
