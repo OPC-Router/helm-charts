@@ -70,6 +70,12 @@ securityContext: {}
   # runAsNonRoot: true
   # runAsUser: 1000
 
+webManagement:
+  auth:
+    disable: false
+    initialUser:
+      name: "admin"
+      password: "or5"
 
 service:
   enabled: true
@@ -78,7 +84,7 @@ service:
   # NodePort allows outside access on a random or specific (nodePort) Port.
   type: ClusterIP
   # Internal port. The service will be reachable under this port inside the cluster.
-  port: 27017
+  port: 8080
   # External port. When NodePort, these ports will allow external access to the service.
   # When list left blank, NodePort will chose a random port itself.
   # nodePort need to be in range 30000 to 32768.
@@ -94,29 +100,53 @@ service:
   # Some cloud providers may need special annotations for their loadbalancers to work.
   annotations: {}
 
-license:
-  # Storage capacity of license volume claim.
-  capacity: "100M"
-  # Storage class name of license volume claim.
-  # If left as empty, will use default storage class, when availible.
-  storageClassName:
-  # If true, the license volume claim and volume will persist even after uninstalling the chart.
-  keepAfterUninstall: false
-  storageVolume:
-    # If true, a new persistant volume is created for the license using the settings provided here.
-    # When false, dynamic provisioning might still create a volume using the setting specified by the storageClass. 
-    createVolume: false
-    # Persistant volume retain policy of license volume.
-    reclaimPolicy: Retain
-    # Volume type of license volume.
-    volumeType: local
-    # Volume type specific settings.
-    volumeTypeOptions: 
-      path: /license
-    # Mount options of license volume.
-    mountOptions: []
-    # Node affinity settings of license volume.
-    nodeAffinity: {}
+claims:
+  log:
+    # Storage capacity of logging volume claim.
+    capacity: "1Gi"
+    # Storage class name of logging volume claim.
+    # If left as empty, will use default storage class, when availible.
+    storageClassName:
+    # If true, the logging volume claim and volume will persist even after uninstalling the chart.
+    keepAfterUninstall: false
+    storageVolume:
+      # If true, a new persistant volume is created for the log files using the settings provided here.
+      # When false, dynamic provisioning might still create a volume using the setting specified by the storageClass. 
+      createVolume: false
+      # Persistant volume retain policy of logging volume.
+      reclaimPolicy: Retain
+      # Volume type of logging volume.
+      volumeType: local
+      # Volume type specific settings.
+      volumeTypeOptions: 
+        path: /logs
+      # Mount options of logging volume.
+      mountOptions: []
+      # Node affinity settings of logging volume.
+      nodeAffinity: {}
+  inray:
+    # Storage capacity of license volume claim.
+    capacity: "100M"
+    # Storage class name of license volume claim.
+    # If left as empty, will use default storage class, when availible.
+    storageClassName:
+    # If true, the license volume claim and volume will persist even after uninstalling the chart.
+    keepAfterUninstall: false
+    storageVolume:
+      # If true, a new persistant volume is created for the license using the settings provided here.
+      # When false, dynamic provisioning might still create a volume using the setting specified by the storageClass. 
+      createVolume: false
+      # Persistant volume retain policy of license volume.
+      reclaimPolicy: Retain
+      # Volume type of license volume.
+      volumeType: local
+      # Volume type specific settings.
+      volumeTypeOptions: 
+        path: /inray
+      # Mount options of license volume.
+      mountOptions: []
+      # Node affinity settings of license volume.
+      nodeAffinity: {}
 
 ingress:
   enabled: false
@@ -158,7 +188,7 @@ containerHistoryLimit: 10
 # Switching this to to true represents accepting the terms and conditions of the end user license agreement.
 # If this is false the opc router container won't be able to run.
 # https://www.opc-router.com/terms-of-use-and-eula/
-I_do_accept_the_EULA: false
+I_do_accept_the_EULA: true
 
 project:
   # URL to git repository of the opcrouter4 project. Optional. Can be left empty, resulting in no project being loaded.

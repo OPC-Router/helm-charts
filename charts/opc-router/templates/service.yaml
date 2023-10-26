@@ -16,9 +16,9 @@ spec:
       {{- with .Values.service.nodePort }}
       nodePort: {{ . }}
       {{- end }}
-      targetPort: mongodb
+      targetPort: web-management
       protocol: TCP
-      name: mongodb
+      name: web-management
   {{- with .Values.service.externalIPs }}
   externalIPs:
     {{- toYaml . | nindent 4 }}

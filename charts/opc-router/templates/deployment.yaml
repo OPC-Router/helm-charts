@@ -40,6 +40,8 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
+            - containerPort: 8080
+              name: web-management
             {{- if eq .Values.image.repository "opcrouter/runtime" }}
             {{- if not .Values.mongodb.deploy }}
             - name: mongodb
@@ -61,8 +63,8 @@ spec:
           env:
           # Variables for connecting a service to the mongodb if a service is specified
           {{- if .Values.mongodb.deploy }}
-          - name: OR_DATABASE_HOST_ADRESS
-            value: "{{ include "getMongoDB" . }}" 
+          - name: OR_DATABASE_CONNECTION_STRING
+            value: {{ include "getMongoDB" . }}
           {{- if .Values.mongodb.auth.enabled }}
           - name: OR_DATABASE_USERNAME
             value: root
@@ -74,6 +76,19 @@ spec:
                 key: mongodb-root-password
           {{- end }}
           {{- end }} 
+          {{- if .Values.webManagement.auth.disable }}
+          - name: OR_DISABLE_AUTH
+            value: {{ .Values.webManagement.auth.disable | quote }}
+          {{- else }}
+          {{- with .Values.webManagement.auth.initialUser.name }}
+          - name: INITIAL_USERNAME
+            value: {{ . | quote }}
+          {{- end }}
+          {{- with .Values.webManagement.auth.initialUser.password }}
+          - name: INITIAL_PASSWORD
+            value: {{ . | quote }}
+          {{- end }}
+          {{- end }}
           - name: OR_I_ACCEPT_EULA
             value: {{ .Values.I_do_accept_the_EULA | quote }}
           # Loading environment variables specified in the values file
@@ -85,8 +100,10 @@ spec:
             {{- toYaml .Values.resources | nindent 12 }}
           # Volume mount for license
           volumeMounts:
-          - mountPath: /root/.dotnet/corefx/cryptography/x509stores/
-            name: license-volume
+          - mountPath: /inray/
+            name: inray-volume
+          - mountPath: /var/log/opcrouter/
+            name: log-volume
       {{- if .Values.project.projectRepo }}
       # Project repo is specified: Get and load project
       # Volume mount for the project and configuration file
@@ -158,9 +175,12 @@ spec:
       {{- end }}
       # Volume for the project and configuration file
       volumes:
-      - name: license-volume
+      - name: inray-volume
         persistentVolumeClaim:
-          claimName: {{ include "opc-router.license.fullname" . }}
+          claimName: {{ include "opc-router.inray.fullname" . }}
+      - name: log-volume
+        persistentVolumeClaim:
+          claimName: {{ include "opc-router.log.fullname" . }}
       {{- if .Values.project.projectRepo }}
       - name: project-volume
       {{- if .Values.project.persistantVolume.deploy }}

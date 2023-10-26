@@ -1,19 +1,19 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ include "opc-router.license.fullname" . }}
+  name: {{ include "opc-router.log.fullname" . }}
   labels:
     {{- include "opc-router.labels" . | nindent 4 }}
-  {{- if .Values.license.keepAfterUninstall }}
+  {{- if .Values.claims.log.keepAfterUninstall }}
   annotations:
     "helm.sh/resource-policy": keep
   {{- end }}
 spec:
-  {{- with .Values.license.storageClassName }}
+  {{- with .Values.claims.log.storageClassName }}
   storageClassName: {{ . }}
   {{- end }}
   accessModes:
     - ReadWriteOnce
   resources:
     requests:
-      storage: {{ .Values.license.capacity }}
+      storage: {{ .Values.claims.log.capacity }}
