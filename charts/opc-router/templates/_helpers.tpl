@@ -61,7 +61,6 @@ Selector labels
 {{- define "opc-router.selectorLabels" -}}
 app.kubernetes.io/instance: {{ .Release.Name }}
 statefulset.kubernetes.io/pod-name: {{ include "opc-router.fullname" . }}
-
 {{- end }}
 
 {{/*

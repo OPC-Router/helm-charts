@@ -104,7 +104,7 @@ spec:
             valueFrom:
               secretKeyRef:
                 name: {{ .Values.project.auth.ssh_secret | default (printf "%s-%s" (include "opc-router.fullname" $) "secret" | trunc 63 | trimSuffix "-") }}
-                key: project-ssh-key
+                key: ssh-privatekey
           {{- end }}
         {{- end }}
       # Init container for pulling the project files
@@ -126,7 +126,7 @@ spec:
           valueFrom:
             secretKeyRef:
               name: {{ .Values.project.auth.ssh_secret | default (printf "%s-%s" (include "opc-router.fullname" $) "secret" | trunc 63 | trimSuffix "-") }}
-              key: project-ssh-key
+              key: ssh-privatekey
         {{- end }}
       # Volume for the project and configuration file
       volumes:
