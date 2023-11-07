@@ -89,7 +89,7 @@ service:
   # NodePort allows outside access on a random or specific (nodePort) Port.
   type: ClusterIP
   # Internal port. The service will be reachable under this port inside the cluster.
-  port: 8080
+  port: 8443
   # External port. When NodePort, these ports will allow external access to the service.
   # When list left blank, NodePort will chose a random port itself.
   # nodePort need to be in range 30000 to 32768.

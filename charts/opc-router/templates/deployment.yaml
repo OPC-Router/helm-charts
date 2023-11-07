@@ -40,8 +40,15 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
+            {{- if .Values.webManagement.https.disable }}
             - containerPort: 8080
+              protocol: TCP
               name: web-management
+            {{- else }}
+            - containerPort: 8443
+              protocol: TCP
+              name: web-management
+            {{- end }}
             {{- if eq .Values.image.repository "opcrouter/runtime" }}
             {{- if not .Values.mongodb.deploy }}
             - name: mongodb
