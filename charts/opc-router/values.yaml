@@ -72,12 +72,12 @@ securityContext: {}
 
 webManagement:
   https:
-    disable: false
+    disable: true
     publicKey: 
     privateKey: 
     privateKeySecret: 
   auth:
-    disable: false
+    disable: true
     initialUser:
       name: "admin"
       password: "or5"
@@ -124,7 +124,7 @@ claims:
       volumeType: local
       # Volume type specific settings.
       volumeTypeOptions: 
-        path: /logs
+        path: /var/log/opcrouter
       # Mount options of logging volume.
       mountOptions: []
       # Node affinity settings of logging volume.
@@ -147,7 +147,7 @@ claims:
       volumeType: local
       # Volume type specific settings.
       volumeTypeOptions: 
-        path: /inray
+        path: /data
       # Mount options of license volume.
       mountOptions: []
       # Node affinity settings of license volume.
@@ -218,20 +218,3 @@ project:
     ssh_key:
     # If false, the ssh key won't be saved on the cluster and will be deleted from the cluster.
     safe_key: true
-  redundancy:
-    # If true, a redundancy twin of the opcrouter deployment is deployed.
-    # The twin will be configured like the original, but will only run activly and be reachable when the original is down.
-    # When deploying the mongodb pod, mongodb.replicaCount should be set to 2, so the redundancy twin also can connect to a database.  
-    deploy: false
-    pingInterval: 60000
-    reconnectCheckPeriod: 60000
-    readinessProbe:
-      # Time before the readness probe starts checking for container in seconds.
-      initialDelaySeconds: 20
-      # Interval at which the container will be probed in seconds. Lower means faster.
-      periodSeconds: 2
-    persistantVolume:
-      # Deploy a persistant storage volume for the redundAncy twin. When false, a non-persistant volume is used.
-      deploy: true
-      # Size of the persistant storage volume. Default 3Gi.
-      size: 3Gi

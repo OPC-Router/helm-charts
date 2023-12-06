@@ -56,16 +56,6 @@ spec:
               protocol: TCP
             {{- end }}
             {{- end }}
-            {{- if .Values.project.redundancy.deploy }}
-            - name: ready
-              containerPort: 49954
-              protocol: TCP
-          readinessProbe:
-            tcpSocket:
-              port: ready
-            initialDelaySeconds: {{ .Values.project.redundancy.readinessProbe.initialDelaySeconds }}
-            periodSeconds: {{ .Values.project.redundancy.readinessProbe.periodSeconds }}
-            {{- end }}
           # Environment variables for the opcrouter container
           env:
           # Variables for connecting a service to the mongodb if a service is specified
@@ -115,9 +105,9 @@ spec:
             {{- toYaml .Values.resources | nindent 12 }}
           # Volume mount for license
           volumeMounts:
-          - mountPath: /inray/
+          - mountPath: /data
             name: inray-volume
-          - mountPath: /var/log/opcrouter/
+          - mountPath: /var/log/opcrouter
             name: log-volume
           {{- if not .Values.webManagement.https.disable }}
           - mountPath: /https
