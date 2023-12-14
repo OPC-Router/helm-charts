@@ -77,9 +77,9 @@ spec:
             value: {{ .Values.webManagement.https.disable | quote }}
           {{- if not .Values.webManagement.https.disable }}
           - name: OR_WEB_HTTPS_CERTIFICATE_PEM_FILE
-            value: /https/ssh-publickey
+            value: /https/tls.crt
           - name: OR_WEB_HTTPS_CERTIFICATE_KEY_PEM_FILE
-            value: /https/ssh-privatekey
+            value: /https/tls.key
           {{- end }}
           {{- if .Values.webManagement.auth.disable }}
           - name: OR_DISABLE_AUTH
@@ -93,6 +93,14 @@ spec:
           - name: INITIAL_PASSWORD
             value: {{ . | quote }}
           {{- end }}
+          {{- end }}
+          {{- if .Values.project.projectRepo }}
+          - name: OR_IMPORT_SOURCE
+            value: "/data/project/{{ .Values.project.projectPath }}"
+          - name: OR_IMPORT_ALLOW_CLEAR_CONFIG
+            value: "true"
+          - name: OR_IMPORT_RUNTIME_CONFIGURATION_FILE
+            value: "/data/project/{{ .Values.project.configPath }}"
           {{- end }}
           - name: OR_I_ACCEPT_EULA
             value: {{ .Values.I_do_accept_the_EULA | quote }}
@@ -114,29 +122,12 @@ spec:
             name: https-volume
             readOnly: true
           {{- end }}
-      {{- if .Values.project.projectRepo }}
-      # Project repo is specified: Get and load project
-      # Volume mount for the project and configuration file
-          - mountPath: /data
+          {{- if .Values.project.projectRepo }}
+          - mountPath: /data/project
             name: project-volume
-          # Command and arguments for loading the project and configuration into the opcrouter
-          command: ["/init", "dotnet", "/app/inray.OPCRouter.Service.dll", "import-project"]
-          args: 
-            - "--source"
-            - "/data/project/{{ .Values.project.projectPath }}"
-            {{- if eq .Values.image.repository "opcrouter/runtime" }}
-            {{- if eq .Values.mongodb.deploy false }}
-            - "--configdb"
-            - "OPCRouterRuntime"
-            {{- end }}
-            {{- end }}
-            - "--allow-clear-config"
-            - "--start-service"
-            {{- if .Values.project.configPath }}
-            - "--runtime-configuration-filepath"
-            - "/data/project/{{ .Values.project.configPath }}"
-            {{- end }}
-        {{- if .Values.project.autoUpdate }}
+          {{- end }}
+      {{- if .Values.project.projectRepo }}
+        {{- if not .Values.project.autoUpdate.disable }}
         - name: kubernetes-proxy
           image: bitnami/kubectl:latest
           # Script for setting ssh credentials and cloning the repository onto the volume
@@ -150,15 +141,12 @@ spec:
             {{- include "project.gitops" $ | indent 12}}
           # Volume mount for the project and configuration file
           volumeMounts:
-          - mountPath: /data
+          - mountPath: /data/project
             name: project-volume
           {{- if (or .Values.project.auth.ssh_key .Values.project.auth.ssh_secret) }}
-          env:
-          - name: PROJECT_SSH_KEY
-            valueFrom:
-              secretKeyRef:
-                name: {{ .Values.project.auth.ssh_secret | default (printf "%s-%s" (include "opc-router.fullname" $) "secret" | trunc 63 | trimSuffix "-") }}
-                key: ssh-privatekey
+          - mountPath: /.ssh
+            name: ssh-volume
+            readOnly: true
           {{- end }}
         {{- end }}
       # Init container for pulling the project files
@@ -172,15 +160,12 @@ spec:
           {{- include "project.clone" $ | indent 10}}
         # Volume mount for the project and configuration file
         volumeMounts:
-        - mountPath: /data
+        - mountPath: /data/project
           name: project-volume
         {{- if (or .Values.project.auth.ssh_key .Values.project.auth.ssh_secret) }}
-        env:
-        - name: PROJECT_SSH_KEY
-          valueFrom:
-            secretKeyRef:
-              name: {{ .Values.project.auth.ssh_secret | default (printf "%s-%s" (include "opc-router.fullname" $) "secret" | trunc 63 | trimSuffix "-") }}
-              key: ssh-privatekey
+        - mountPath: /.ssh
+          name: ssh-volume
+          readOnly: true
         {{- end }}
       {{- end }}
       # Volume for the project and configuration file
@@ -194,17 +179,18 @@ spec:
       {{- if not .Values.webManagement.https.disable }}
       - name: https-volume
         secret:
+          type: kubernetes.io/tls
+          secretName: {{ .Values.webManagement.https.existingTlsSecret | default (printf "%s-%s" (include "opc-router.fullname" $) "tls-secret" | trunc 63 | trimSuffix "-")}}
+      {{- end }}
+      {{- if (or .Values.project.auth.ssh_key .Values.project.auth.ssh_secret) }}
+      - name: ssh-volume
+        secret:
           type: kubernetes.io/ssh-auth
-          secretName: {{ .Values.webManagement.https.privateKeySecret | default (printf "%s-%s" (include "opc-router.fullname" $) "web-secret" | trunc 63 | trimSuffix "-")}}
+          secretName: {{ .Values.project.auth.ssh_secret | default (printf "%s-%s" (include "opc-router.fullname" $) "ssh-secret" | trunc 63 | trimSuffix "-")}}
       {{- end }}
       {{- if .Values.project.projectRepo }}
       - name: project-volume
-      {{- if .Values.project.persistantVolume.deploy }}
-        persistentVolumeClaim:
-          claimName: {{ include "opc-router.fullname" . }}
-      {{- else}}
         emptyDir: {}
-      {{- end }}
       {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:

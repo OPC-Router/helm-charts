@@ -72,15 +72,24 @@ securityContext: {}
 
 webManagement:
   https:
+    # If false, enables https for the web management.
+    # Requires either existingTlsSecret or cert and key to be set.
     disable: true
-    publicKey: 
-    privateKey: 
-    privateKeySecret: 
+    # Set the TLS certificate used for web management https.
+    cert: 
+    # Set the TLS key corrosponding to the TLS certificate.
+    key: 
+    # Set an existing kubernetes.io/tls secret to be used for web management https.
+    # Takes priority over cert and key.
+    existingTlsSecret: 
   auth:
+    # If false, enables authentification for the web management.
     disable: true
-    initialUser:
-      name: "admin"
-      password: "or5"
+    initialUser: 
+      # Sets the name of the initial user.
+      name: 
+      # Sets the password of the initial user.
+      password: 
 
 service:
   enabled: true
@@ -193,28 +202,24 @@ containerHistoryLimit: 10
 # Switching this to to true represents accepting the terms and conditions of the end user license agreement.
 # If this is false the opc router container won't be able to run.
 # https://www.opc-router.com/terms-of-use-and-eula/
-I_do_accept_the_EULA: true
+I_do_accept_the_EULA: false
 
 project:
   # URL to git repository of the opcrouter4 project. Optional. Can be left empty, resulting in no project being loaded.
-  projectRepo:
+  projectRepo: 
   # Path to the project .rpe file in the repository. Don't begin with '/'. Optional. Can be left out if no projectRepo is provided. 
-  projectPath:
+  projectPath: 
   # Path to the projects configuration file. Optional. Not providing it results in no configuration file being loaded.
-  configPath:
-  # If true, the project will be automatically updated when it changes in the repository. Experimental.
-  autoUpdate: false
-  persistantVolume:
-    # Deploy a persistant storage volume for the opcrouter project and runtime database. When false, a non-persistant volume is used.
-    deploy: true
-    # Size of the persistant storage volume. Default 3Gi.
-    size: 3Gi
+  configPath: 
+  autoUpdate:
+    # If false, the project will be automatically updated when it changes in the repository. Experimental.
+    disable: true
+    # Interval in seconds the git repository gets fetched to check for updates
+    interval: 300
   auth:
     # An existing secret containing the ssh-key under the key 'ssh-privatekey'. Optional.
     # Must be in the same namespace as this application. Takes priority over ssh_key.
-    ssh_secret:
+    ssh_secret: 
     # SSH private key for accessing the git repository. Optional.
     # Line breaks must be represented by '\n'
-    ssh_key:
-    # If false, the ssh key won't be saved on the cluster and will be deleted from the cluster.
-    safe_key: true
+    ssh_key: 
