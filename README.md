@@ -39,12 +39,7 @@
   - [**Adding extra environment variables**](#adding-extra-environment-variables)
 
 ## General Information
-> The OPC Router 4 is generally structured in two parts:
-> - The Runtime
-> - Management with the user interface
->  
-> The two components may run on two completely different systems.  
-> To set/edit the OPC Router 4, it is connected to the OPC Router Runtime via OPC Router Management, this abstraction allows the settings to be made remotely.
+
 ### **What is the helm chart doing?**
 - This helm chart will allow deploying the opc router onto any kubernetes cluster.
 - There are multiple possible configurations to deploy the opc router this chart allows.
@@ -74,12 +69,15 @@ helm install my-opcrouter opc-router/opc-router \
 ```
 This command will install the opc router with standard settings, as a service with a seperate mongodb container. The mongodb won't require authentification, which is not recommended. Accepting the [End User License Agreement](https://www.opc-router.com/terms-of-use-and-eula/) by setting `I_do_accept_the_EULA` to true is required for the OPCRouter to run.
 
-To deploy this chart with password authetification use this command:
+To deploy this chart with password authentification for the web management and for the mongodb use this command:
 ```shell
 helm install my-opcrouter opc-router/opc-router \
+  --set webManagement.auth.disable=false \
+  --set webManagement.auth.initialUser.name=<Your desired initial web management user name>\
+  --set webManagement.auth.password.name=<Your desired initial web management user password>\
   --set mongodb.auth.enabled=true \
-  --set mongodb.auth.rootPassword=<Your desired root password> \
-  --set mongodb.auth.replicaSetKey=<Your desired replicaset key> \
+  --set mongodb.auth.rootPassword=<Your desired mongodb root password> \
+  --set mongodb.auth.replicaSetKey=<Your desired mongodb replicaset key> \
   --set I_do_accept_the_EULA=true
 ```
 Keep in mind that the root password and replicaset key can't be changed once set. When leaving the password and/or replicaset key empty when auth is enabled, the chart will autogenerate the missing secret.
@@ -113,44 +111,48 @@ However, keep in mind that the persitant volumes of the mongodb container don't 
 
 ### **OPCRouter parameters**
 
-| Name                              | Description                                                                                             | Value               |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------- |
-| `I_do_accept_the_EULA`            | If this is false the opc router container won't be able to run.                                         | `false`             |
-| `image.repository`                | OPC-Router image registry.                                                                              | `opcrouter/service` |
-| `image.tag`                       | OPC-Router image tag (immutable tags are recommended).                                                  | `""`                |
-| `image.pullPolicy`                | OPC-Router image pull policy.                                                                           | `IfNotPresent`      |
-| `envVars`                         | Array of environment variables for the opc router container.                                            | `[]`               |
-| `serviceAccount.create`           | Specifies whether a service account should be created.                                                  | `true`              |
-| `serviceAccount.annotations`      | Annotations to add to the service account.                                                              | `{}`                |
-| `serviceAccount.name`             | Name of the service account to use. If not set and create is true, it is generated using the fullname.  | `""`                |
-| `project.projectRepo`             | URL to git repository of a opcrouter4 project. Optional. Empty means no project gets loaded.            | `""`                |
-| `project.projectPath`             | Path to the project .rpe file in the repository. Don't begin with '/'. Optional.                        | `""`                |
-| `project.configPath`              | Path to a projects configuration file. Optional. Empty means no configuration file gets loaded.         | `""`                |
-| `project.auth.ssh_secret`         | An existing secret containing the ssh-key under the key 'project-ssh-key'. Optional.                    | `""`                |
-| `project.auth.ssh_key`            | SSH private key for accessing the git repository. Overridden by ssh_secret, Optional.                   | `""`                |
-| `project.auth.safe_key`           | If false, the ssh key won't be saved on the cluster and will be deleted from the cluster.               | `true`              |
-| `project.persistantVolume.deploy` | If true, deploys a persistant storage volume for the project and runtime db.                            | `true`              |
-| `project.persistantVolume.size`   | The size of the persistant volume.                                                                      | `3Gi`               |
-| `containerHistoryLimit`           | The size of the history of deployments kept for potential rollbacks.                                    | `10`                |
-| `mongodb.deploy`                  | If false, the mongodb container wont be deployed. Useful when using integrated db of opcrouter/runtime. | `true`              |
-| `mongodb.replicaCount`            | The number of mongodb pods to deploy. Set to two when using a redundency twin.                          | `1`                 |
-| `mongodb.auth.enabled`            | If false, the mongodb won't require any authentification to access.                                     | `false`             |
-| `mongodb.auth.existingSecret`     | Existing secret with mongodb credentials (keys: mongodb-root-password, mongodb-replica-set-key).        | `""`                |
-| `mongodb.auth.rootPassword`       | Root password for the mongodb. Will override autogenerated or existing one in secret.                   | `""`                |
-| `mongodb.auth.replicaKeySet`      | Replica set key for the mongodb. Will override autogenerated or existing one in secret.                 | `""`                |
-| `service.enabled`                 | If false, the application won't be reachable from outside the cluster.                                  | `true`              |
-| `service.type`                    | Type of the service. Possible values: ClusterIP, NodePort, LoadBalancer.                                | `ClusterIP`         |
-| `service.port`                    | Internal port. The service will be reachable under this port inside the cluster.                        | `27017`             |
-| `service.nodePort`                | External port. When NodePort, this port will allow external access to the service.                      | `""`                |
-| `service.externalIPs`             | External IPs. Reachable under these IPs, when traffic ingresses into cluster with IPs as destination.   | `[]`                |
-| `service.loadBalancerIP`          | LoadBalancer IP. Used by some cloud providers to add external load balancers.                           | `""`                |
+| Name                                      | Description                                                                                             | Default value       |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------- |
+| `I_do_accept_the_EULA`                    | If this is false the opc router container won't be able to run.                                         | `false`             |
+| `image.repository`                        | OPC-Router image registry.                                                                              | `opcrouter/service` |
+| `image.tag`                               | OPC-Router image tag (immutable tags are recommended).                                                  | `""`                |
+| `image.pullPolicy`                        | OPC-Router image pull policy.                                                                           | `IfNotPresent`      |
+| `envVars`                                 | Array of environment variables for the opc router container.                                            | `[]`                |
+| `serviceAccount.create`                   | Specifies whether a service account should be created.                                                  | `true`              |
+| `serviceAccount.annotations`              | Annotations to add to the service account.                                                              | `{}`                |
+| `serviceAccount.name`                     | Name of the service account to use. If not set and create is true, it is generated using the fullname.  | `""`                |
+| `project.projectRepo`                     | URL to git repository of a opcrouter4 project. Optional. Empty means no project gets loaded.            | `""`                |
+| `project.projectPath`                     | Path to the project .rpe file in the repository. Don't begin with '/'. Optional.                        | `""`                |
+| `project.configPath`                      | Path to a projects configuration file. Optional. Empty means no configuration file gets loaded.         | `""`                |
+| `project.auth.ssh_secret`                 | An existing secret containing the ssh-key under the key 'project-ssh-key'. Optional.                    | `""`                |
+| `project.auth.ssh_key`                    | SSH private key for accessing the git repository. Overwritten by ssh_secret, Optional.                  | `""`                |
+| `containerHistoryLimit`                   | The size of the history of deployments kept for potential rollbacks.                                    | `10`                |
+| `mongodb.deploy`                          | If false, the mongodb container wont be deployed. Useful when using integrated db of opcrouter/runtime. | `true`              |
+| `mongodb.replicaCount`                    | The number of mongodb pods to deploy. Set to two when using a redundency twin.                          | `1`                 |
+| `mongodb.auth.enabled`                    | If false, the mongodb won't require any authentification to access.                                     | `false`             |
+| `mongodb.auth.existingSecret`             | Existing secret with mongodb credentials (keys: mongodb-root-password, mongodb-replica-set-key).        | `""`                |
+| `mongodb.auth.rootPassword`               | Root password for the mongodb. Will override autogenerated or existing one in secret.                   | `""`                |
+| `mongodb.auth.replicaSetKey`              | Replica set key for the mongodb. Will override autogenerated or existing one in secret.                 | `""`                |
+| `webManagement.auth.disable`              | If false, the web management will require authentification to be accessed.                              | `true`              |
+| `webManagement.auth.initialUser.name`     | The username of the initial user. If left empty, there will be no initial user.                         | `""`                |
+| `webManagement.auth.initialUser.password` | The password of the initial user. If left empty, there will be no initial user.                         | `""`                |
+| `webManagement.https.disable`             | If false, the web management will use https. This requires a TLS key and certificate to be set.         | `true`              |
+| `webManagement.https.cert`                | The tls certificate used for https. Is overwritten by existingTlsSecret.                                | `""`                |
+| `webManagement.https.key`                 | The tls key corrosponding to he certificate used for https. Is overwritten by existingTlsSecret.        | `""`                |
+| `webManagement.https.existingTlsSecret`   | An existing kubernetes.io/tls secret. Will overwrite cert and key.                                      | `""`                |
+| `service.enabled`                         | If false, the application won't be reachable from outside the cluster.                                  | `true`              |
+| `service.type`                            | Type of the service. Possible values: ClusterIP, NodePort, LoadBalancer.                                | `ClusterIP`         |
+| `service.port`                            | Internal port. The service will be reachable under this port inside the cluster.                        | `8443`              |
+| `service.nodePort`                        | External port. When NodePort, this port will allow external access to the service.                      | `""`                |
+| `service.externalIPs`                     | External IPs. Reachable under these IPs, when traffic ingresses into cluster with IPs as destination.   | `[]`                |
+| `service.loadBalancerIP`                  | LoadBalancer IP. Used by some cloud providers to add external load balancers.                           | `""`                |
 
 ## **WARNING: MongoDB root password and replica key set**
 
-When using the mongodb container, keep in mind that that the root password and replica key set can only be set once, as upon initial declaration they are stored in a persistent volume. This may be an issue when using automatically deploying the chart using ArgoCD or Flux, as automatic redeployments can cause the root password to be regenerated when not having set static values for them in the values.yaml. This however will only make the database inaccessible to the opc router, as it will use the new passwords, though the mongodb still uses the old initial passwords. Thus it is highly recommended to set mongodb.auth.dbRootPassword and mongodb.auth.dbReplicaKeySet when not manually deploying the chart for testing purposes.
+When using the mongodb container, keep in mind that that the root password and replica key set can only be set once, as upon initial declaration they are stored in a persistent volume. This may be an issue when using automatically deploying the chart using ArgoCD or Flux, as automatic redeployments can cause the root password to be regenerated when not having set static values for them in the values.yaml. This however will only make the database inaccessible to the opc router, as it will use the new passwords, though the mongodb still uses the old initial passwords. Thus it is highly recommended to set mongodb.auth.existingSecret or mongodb.auth.rootPassword and mongodb.auth.replicaSetKey when not manually deploying the chart for testing purposes.
 
 ## **Redundancy mode**
-The opc router and mongodb deployed by the chart can both be configured to run in redundancy mode, offering increased protection against hardware loss.
+The opc router and mongodb deployed by the chart can both be configured to run in redundancy mode, offering increased protection against hardware failures.
 
 ### **OPC Router redudancy mode**
 Setting the opc router into redundancy mode will cause a second pod with a opc router runtime container to be deployed. This container will load the same project as the main container, but will remain dorment until the main container is unreachable.
@@ -176,7 +178,7 @@ A helm install command can also be issued with specifiying multiple environment 
 ```shell
 $ helm install my-opcrouter opc-router/opc-router \
   --set envVars[0].TESTVAR="successful" \
-  --set envVars[1].OtherVariable=42 \
-  --set envVars[2].yetAnotherVar=false \
+  --set envVars[1].OtherVariable="42" \
+  --set envVars[2].yetAnotherVar="false" \
   --set I_do_accept_the_EULA=true
 ```
