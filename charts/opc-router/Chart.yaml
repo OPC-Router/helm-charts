@@ -27,4 +27,4 @@ dependencies:
  - name: mongodb
    condition: mongodb.deploy
    version: ~10.x
-   repository: https://charts.bitnami.com/bitnami
+   repository: https://raw.githubusercontent.com/bitnami/charts/archive-full-index/bitnami
