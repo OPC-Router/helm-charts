@@ -3,14 +3,14 @@ Commands to setup ssh authentification for the project repo
 */}} 
 {{- define "project.ssh" }}
   {{- if (or $.Values.project.auth.ssh_key $.Values.project.auth.ssh_secret) }}
-  cd ~;
-  mkdir .ssh;
-  cd .ssh;
   ssh -o StrictHostKeyChecking=no {{ regexFind "[@\\/][^:\\/]*[\\/:]" $.Values.project.projectRepo | trimPrefix "\\/" | trimPrefix "@" | trimSuffix "\\/" | trimSuffix ":"}};
-  echo -e $PROJECT_SSH_KEY > id;
-  chmod 400 id;
+  cd ~;
+  mkdir -p .ssh;
+  cd .ssh;
+  cp /.ssh/ssh-privatekey key;
+  chmod 400 key;
   eval `ssh-agent`;
-  ssh-add id;
+  ssh-add key;
   {{- end }}
 {{- end }}
 
@@ -21,7 +21,9 @@ Commands to clone the project repo
   {{- include "project.ssh" $}}  
   rm -rf /data/project;
   mkdir -p /data/project;
-  git clone {{ .Values.project.projectRepo }} /data/project;
+  cd /data/project;
+  git clone {{ .Values.project.projectRepo }} .;
+  ls;
   echo Done;
 {{- end }}
 
@@ -57,10 +59,10 @@ Commands to continuously update the project and restart the pod on new version
   cat <<EOF > ~/gitops.sh
     cd /data/project;
     while [ true ]; do
-      sleep 60;
+      sleep {{ .Values.project.autoUpdate.interval }};
       {{- if (or $.Values.project.auth.ssh_key $.Values.project.auth.ssh_secret) }}
       eval \`ssh-agent\`;
-      ssh-add ~/.ssh/id;
+      ssh-add ~/.ssh/key;
       {{- end }}
       git fetch;
       if [ \$(git rev-parse HEAD) != \$(git rev-parse @{u}) ]; then

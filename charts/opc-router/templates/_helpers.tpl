@@ -27,8 +27,12 @@ If release name contains chart name it will be used as a full name.
 {{- include "opc-router.fullname" . | cat "redundant" | replace " " "-" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
-{{- define "opc-router.license.fullname" -}}
-{{- include "opc-router.fullname" . | cat "license" | replace " " "-" | trunc 63 | trimSuffix "-" }}
+{{- define "opc-router.inray.fullname" -}}
+{{- include "opc-router.fullname" . | cat "inray" | replace " " "-" | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{- define "opc-router.log.fullname" -}}
+{{- include "opc-router.fullname" . | cat "log" | replace " " "-" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
@@ -56,7 +60,7 @@ Selector labels
 */}}
 {{- define "opc-router.selectorLabels" -}}
 app.kubernetes.io/instance: {{ .Release.Name }}
-statefulset.kubernetes.io/pod-name: {{ .Release.Name }}-mongodb-0
+statefulset.kubernetes.io/pod-name: {{ include "opc-router.fullname" . }}
 {{- end }}
 
 {{/*
@@ -86,6 +90,6 @@ Create the connection string for the mongodb(s)
 {{- if (ne . 0) -}}
 ,
 {{- end -}}
-{{ $.Release.Name }}-mongodb-{{ . }}.{{ $.Release.Name }}-mongodb-headless
+"mongodb://{{ $.Release.Name }}-mongodb-{{ . }}.{{ $.Release.Name }}-mongodb-headless"
 {{- end }}
 {{- end }}

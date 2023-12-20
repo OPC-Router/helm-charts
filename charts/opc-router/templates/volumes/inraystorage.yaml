@@ -1,0 +1,29 @@
+{{- if .Values.claims.inray.storageVolume.createVolume }}
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ include "opc-router.inray.fullname" . }}
+  labels:
+    type: local
+    {{- include "opc-router.labels" . | nindent 4 }}
+spec:
+  {{- with .Values.claims.inray.storageClassName }}
+  storageClassName: {{ . }}
+  {{- end }}
+  capacity: 
+    storage: {{ .Values.claims.inray.capacity }}
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: {{ .Values.claims.inray.storageVolume.reclaimPolicy }}
+  {{ .Values.claims.inray.storageVolume.volumeType }}:
+  {{- with .Values.claims.inray.storageVolume.volumeTypeOptions }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  claimRef:
+    name: {{ include "opc-router.inray.fullname" . }}
+    namespace: {{ .Release.Namespace }}
+{{- with .Values.claims.inray.storageVolume.nodeAffinity }}
+  nodeAffinity:
+    {{- toYaml . | nindent 4 }}
+{{- end }}
+{{- end }}

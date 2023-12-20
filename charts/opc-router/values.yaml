@@ -70,6 +70,26 @@ securityContext: {}
   # runAsNonRoot: true
   # runAsUser: 1000
 
+webManagement:
+  https:
+    # If false, enables https for the web management.
+    # Requires either existingTlsSecret or cert and key to be set.
+    disable: true
+    # Set the TLS certificate used for web management https.
+    cert: 
+    # Set the TLS key corrosponding to the TLS certificate.
+    key: 
+    # Set an existing kubernetes.io/tls secret to be used for web management https.
+    # Takes priority over cert and key.
+    existingTlsSecret: 
+  auth:
+    # If false, enables authentification for the web management.
+    disable: true
+    initialUser: 
+      # Sets the name of the initial user.
+      name: 
+      # Sets the password of the initial user.
+      password: 
 
 service:
   enabled: true
@@ -78,7 +98,7 @@ service:
   # NodePort allows outside access on a random or specific (nodePort) Port.
   type: ClusterIP
   # Internal port. The service will be reachable under this port inside the cluster.
-  port: 27017
+  port: 8443
   # External port. When NodePort, these ports will allow external access to the service.
   # When list left blank, NodePort will chose a random port itself.
   # nodePort need to be in range 30000 to 32768.
@@ -94,29 +114,53 @@ service:
   # Some cloud providers may need special annotations for their loadbalancers to work.
   annotations: {}
 
-license:
-  # Storage capacity of license volume claim.
-  capacity: "100M"
-  # Storage class name of license volume claim.
-  # If left as empty, will use default storage class, when availible.
-  storageClassName:
-  # If true, the license volume claim and volume will persist even after uninstalling the chart.
-  keepAfterUninstall: false
-  storageVolume:
-    # If true, a new persistant volume is created for the license using the settings provided here.
-    # When false, dynamic provisioning might still create a volume using the setting specified by the storageClass. 
-    createVolume: false
-    # Persistant volume retain policy of license volume.
-    reclaimPolicy: Retain
-    # Volume type of license volume.
-    volumeType: local
-    # Volume type specific settings.
-    volumeTypeOptions: 
-      path: /license
-    # Mount options of license volume.
-    mountOptions: []
-    # Node affinity settings of license volume.
-    nodeAffinity: {}
+claims:
+  log:
+    # Storage capacity of logging volume claim.
+    capacity: "1Gi"
+    # Storage class name of logging volume claim.
+    # If left as empty, will use default storage class, when availible.
+    storageClassName:
+    # If true, the logging volume claim and volume will persist even after uninstalling the chart.
+    keepAfterUninstall: false
+    storageVolume:
+      # If true, a new persistant volume is created for the log files using the settings provided here.
+      # When false, dynamic provisioning might still create a volume using the setting specified by the storageClass. 
+      createVolume: false
+      # Persistant volume retain policy of logging volume.
+      reclaimPolicy: Retain
+      # Volume type of logging volume.
+      volumeType: local
+      # Volume type specific settings.
+      volumeTypeOptions: 
+        path: /var/log/opcrouter
+      # Mount options of logging volume.
+      mountOptions: []
+      # Node affinity settings of logging volume.
+      nodeAffinity: {}
+  inray:
+    # Storage capacity of license volume claim.
+    capacity: "100M"
+    # Storage class name of license volume claim.
+    # If left as empty, will use default storage class, when availible.
+    storageClassName:
+    # If true, the license volume claim and volume will persist even after uninstalling the chart.
+    keepAfterUninstall: false
+    storageVolume:
+      # If true, a new persistant volume is created for the license using the settings provided here.
+      # When false, dynamic provisioning might still create a volume using the setting specified by the storageClass. 
+      createVolume: false
+      # Persistant volume retain policy of license volume.
+      reclaimPolicy: Retain
+      # Volume type of license volume.
+      volumeType: local
+      # Volume type specific settings.
+      volumeTypeOptions: 
+        path: /data
+      # Mount options of license volume.
+      mountOptions: []
+      # Node affinity settings of license volume.
+      nodeAffinity: {}
 
 ingress:
   enabled: false
@@ -162,41 +206,20 @@ I_do_accept_the_EULA: false
 
 project:
   # URL to git repository of the opcrouter4 project. Optional. Can be left empty, resulting in no project being loaded.
-  projectRepo:
+  projectRepo: 
   # Path to the project .rpe file in the repository. Don't begin with '/'. Optional. Can be left out if no projectRepo is provided. 
-  projectPath:
+  projectPath: 
   # Path to the projects configuration file. Optional. Not providing it results in no configuration file being loaded.
-  configPath:
-  # If true, the project will be automatically updated when it changes in the repository. Experimental.
-  autoUpdate: false
-  persistantVolume:
-    # Deploy a persistant storage volume for the opcrouter project and runtime database. When false, a non-persistant volume is used.
-    deploy: true
-    # Size of the persistant storage volume. Default 3Gi.
-    size: 3Gi
+  configPath: 
+  autoUpdate:
+    # If false, the project will be automatically updated when it changes in the repository. Experimental.
+    disable: true
+    # Interval in seconds the git repository gets fetched to check for updates
+    interval: 300
   auth:
-    # An existing secret containing the ssh-key under the key 'project-ssh-key'. Optional.
+    # An existing secret containing the ssh-key under the key 'ssh-privatekey'. Optional.
     # Must be in the same namespace as this application. Takes priority over ssh_key.
-    ssh_secret:
+    ssh_secret: 
     # SSH private key for accessing the git repository. Optional.
     # Line breaks must be represented by '\n'
-    ssh_key:
-    # If false, the ssh key won't be saved on the cluster and will be deleted from the cluster.
-    safe_key: true
-  redundancy:
-    # If true, a redundancy twin of the opcrouter deployment is deployed.
-    # The twin will be configured like the original, but will only run activly and be reachable when the original is down.
-    # When deploying the mongodb pod, mongodb.replicaCount should be set to 2, so the redundancy twin also can connect to a database.  
-    deploy: false
-    pingInterval: 60000
-    reconnectCheckPeriod: 60000
-    readinessProbe:
-      # Time before the readness probe starts checking for container in seconds.
-      initialDelaySeconds: 20
-      # Interval at which the container will be probed in seconds. Lower means faster.
-      periodSeconds: 2
-    persistantVolume:
-      # Deploy a persistant storage volume for the redundAncy twin. When false, a non-persistant volume is used.
-      deploy: true
-      # Size of the persistant storage volume. Default 3Gi.
-      size: 3Gi
+    ssh_key: 

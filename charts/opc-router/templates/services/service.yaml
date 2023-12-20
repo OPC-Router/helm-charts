@@ -16,9 +16,9 @@ spec:
       {{- with .Values.service.nodePort }}
       nodePort: {{ . }}
       {{- end }}
-      targetPort: mongodb
+      targetPort: web-management
       protocol: TCP
-      name: mongodb
+      name: web-management
   {{- with .Values.service.externalIPs }}
   externalIPs:
     {{- toYaml . | nindent 4 }}
@@ -27,5 +27,5 @@ spec:
   loadBalancerIP: {{ . }}
   {{- end }}
   selector:
-    {{- include "opc-router.selectorLabels" . | nindent 4 }}
+    {{- include "opc-router.labels" . | nindent 4 }}
 {{- end }}
