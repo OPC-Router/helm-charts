@@ -74,7 +74,7 @@ To deploy this chart with password authentification for the web management and f
 helm install my-opcrouter opc-router/opc-router \
   --set webManagement.auth.disable=false \
   --set webManagement.auth.initialUser.name=<Your desired initial web management user name>\
-  --set webManagement.auth.password.name=<Your desired initial web management user password>\
+  --set webManagement.auth.initialUser.password=<Your desired initial web management user password>\
   --set mongodb.auth.enabled=true \
   --set mongodb.auth.rootPassword=<Your desired mongodb root password> \
   --set mongodb.auth.replicaSetKey=<Your desired mongodb replicaset key> \
