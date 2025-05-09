@@ -98,6 +98,10 @@ spec:
           - name: OR_IMPORT_RUNTIME_CONFIGURATION_FILE
             value: "/data/project/{{ .Values.project.configPath }}"
           {{- end }}
+          {{-  if .Values.ingress.enabled }}
+          - name: ASPNETCORE_FORWARDEDHEADERS_ENABLED
+            value: "true"
+          {{- end }}
           - name: OR_I_ACCEPT_EULA
             value: {{ .Values.I_do_accept_the_EULA | quote }}
           # Loading environment variables specified in the values file
