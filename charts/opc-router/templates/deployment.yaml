@@ -20,10 +20,8 @@ spec:
       labels:
         {{- include "opc-router.labels" . | nindent 8 }}
         {{- include "opc-router.originalSelectorLabels" . | nindent 8 }}
-        {{- if eq .Values.image.repository "opcrouter/runtime" }}
         {{- if not .Values.mongodb.deploy }}
         {{- include "opc-router.selectorLabels" . | nindent 8 }}
-        {{- end }}
         {{- end }}
     spec:
       {{- with .Values.imagePullSecrets }}
@@ -49,12 +47,10 @@ spec:
               protocol: TCP
               name: web-management
             {{- end }}
-            {{- if eq .Values.image.repository "opcrouter/runtime" }}
             {{- if not .Values.mongodb.deploy }}
             - name: mongodb
               containerPort: 27017
               protocol: TCP
-            {{- end }}
             {{- end }}
           # Environment variables for the opcrouter container
           env:
