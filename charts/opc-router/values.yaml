@@ -6,6 +6,8 @@ image:
   # Image for the opc router container
   # Has to be either "opcrouter/runtime" for the integrated database
   # or "opcrouter/service", which utilizes the external mongodb
+  # If using an image which uses an integrated mongodb like opcrouter/runtime, 
+  # it is required to set 'mongodb.deploy' to 'false' for the integrated mongodb to be used
   repository: opcrouter/service
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.

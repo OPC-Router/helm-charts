@@ -6,7 +6,7 @@
     <br />
   <h1 align="center">OPC Router Helm Chart</h1>
   <p align="center">
-    OPC Router Helm Chart for the deployment of the opc router in a kubernetes cluster.
+    OPC Router Helm Chart for the deployment of the OPC Router in a kubernetes cluster.
     <br />
     <a href="https://opc-router.com/?utm_source=GitHub&utm_medium=HelmChart&utm_campaign=OpcRouterChart"><strong>OPC Router</strong></a>
     -
@@ -30,8 +30,10 @@
   - [**Parameters**](#parameters)
     - [**Global parameters**](#global-parameters)
     - [**Common parameters**](#common-parameters)
-    - [**OPCRouter parameters**](#opcrouter-parameters)
+    - [**OPC Router parameters**](#opc-router-parameters)
   - [**WARNING: MongoDB root password and replica key set**](#warning-mongodb-root-password-and-replica-key-set)
+  - [**Using the `opcrouter/runtime` image**](#using-the-opcrouterruntime-image)
+  - [**Using Ingress or reverse proxies**](#using-ingress-or-reverse-proxies)
   - [**Redundancy mode**](#redundancy-mode)
     - [**OPC Router redudancy mode**](#opc-router-redudancy-mode)
     - [**MongoDB redundancy mode**](#mongodb-redundancy-mode)
@@ -41,8 +43,8 @@
 ## General Information
 
 ### **What is the helm chart doing?**
-- This helm chart will allow deploying the opc router onto any kubernetes cluster.
-- There are multiple possible configurations to deploy the opc router this chart allows.
+- This helm chart will allow deploying the OPC Router onto any kubernetes cluster.
+- There are multiple possible configurations to deploy the OPC Router this chart allows.
 
 # Getting Started
 
@@ -67,7 +69,7 @@ To install the chart with the name `my-opcrouter`:
 helm install my-opcrouter opc-router/opc-router \
   --set I_do_accept_the_EULA=true
 ```
-This command will install the opc router with standard settings, as a service with a seperate mongodb container. The mongodb won't require authentification, which is not recommended. Accepting the [End User License Agreement](https://www.opc-router.com/terms-of-use-and-eula/) by setting `I_do_accept_the_EULA` to true is required for the OPCRouter to run.
+This command will install the OPC Router with standard settings, as a service with a seperate mongodb container. The mongodb won't require authentification, which is not recommended. Accepting the [End User License Agreement](https://www.opc-router.com/terms-of-use-and-eula/) by setting `I_do_accept_the_EULA` to true is required for the OPC Router to run.
 
 To deploy this chart with password authentification for the web management and for the mongodb use this command:
 ```shell
@@ -109,15 +111,15 @@ However, keep in mind that the persitant volumes of the mongodb container don't 
 | `nameOverride`     | String to partially override opc-router.fullname template (will maintain the release name) | `""`  |
 | `fullnameOverride` | String to fully override opc-router.fullname template                                      | `""`  |
 
-### **OPCRouter parameters**
+### **OPC Router parameters**
 
 | Name                                      | Description                                                                                             | Default value       |
 | ----------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------- |
-| `I_do_accept_the_EULA`                    | If this is false the opc router container won't be able to run.                                         | `false`             |
+| `I_do_accept_the_EULA`                    | If this is false the OPC Router container won't be able to run.                                         | `false`             |
 | `image.repository`                        | OPC-Router image registry.                                                                              | `opcrouter/service` |
 | `image.tag`                               | OPC-Router image tag (immutable tags are recommended).                                                  | `""`                |
 | `image.pullPolicy`                        | OPC-Router image pull policy.                                                                           | `IfNotPresent`      |
-| `envVars`                                 | Array of environment variables for the opc router container.                                            | `[]`                |
+| `envVars`                                 | Array of environment variables for the OPC Router container.                                            | `[]`                |
 | `serviceAccount.create`                   | Specifies whether a service account should be created.                                                  | `true`              |
 | `serviceAccount.annotations`              | Annotations to add to the service account.                                                              | `{}`                |
 | `serviceAccount.name`                     | Name of the service account to use. If not set and create is true, it is generated using the fullname.  | `""`                |
@@ -149,15 +151,31 @@ However, keep in mind that the persitant volumes of the mongodb container don't 
 
 ## **WARNING: MongoDB root password and replica key set**
 
-When using the mongodb container, keep in mind that that the root password and replica key set can only be set once, as upon initial declaration they are stored in a persistent volume. This may be an issue when using automatically deploying the chart using ArgoCD or Flux, as automatic redeployments can cause the root password to be regenerated when not having set static values for them in the values.yaml. This however will only make the database inaccessible to the opc router, as it will use the new passwords, though the mongodb still uses the old initial passwords. Thus it is highly recommended to set mongodb.auth.existingSecret or mongodb.auth.rootPassword and mongodb.auth.replicaSetKey when not manually deploying the chart for testing purposes.
+When using the mongodb container, keep in mind that that the root password and replica key set can only be set once, as upon initial declaration they are stored in a persistent volume. This may be an issue when using automatically deploying the chart using ArgoCD or Flux, as automatic redeployments can cause the root password to be regenerated when not having set static values for them in the values.yaml. This however will only make the database inaccessible to the OPC Router, as it will use the new passwords, though the mongodb still uses the old initial passwords. Thus it is highly recommended to set `mongodb.auth.existingSecret` or `mongodb.auth.rootPassword` and `mongodb.auth.replicaSetKey` when not manually deploying the chart for testing purposes.
+
+## **Using the `opcrouter/runtime` image**
+
+By default, the helm chart is configured to use the `opcrouter/service` image, which doesn't include an internal mongodb. The mongodb is then instead also installed sperately by the helm chart.
+
+It is possible to configure the helm chart to use the `opcrouter/runtime` image, which comes with an internal mongodb inside the OPC Router container, by setting `global.imageRegistry` to it. Therefore it is recommended to disable to deployment of the external mongodb, by setting `mongodb.deploy` to `false`, otherwise the internal mongodb will be created and running, but will not be used by the OPC Router.
+
+Furthermore it is also strongly recommended to increase the capacity of the inray volume (`claims.inray.capacity`), as the data of the internal mongodb is stored there, when using the internal mongodb. At minimum it should be set to 2gb, it is however recommended to set it to 8gb.
+
+## **Using Ingress or reverse proxies**
+
+The rerouting of the traffic for to the OPC Router web management may require some extra configuration. Generally, when some form of reverse proxy is being used, the `ASPNETCORE_FORWARDEDHEADERS_ENABLED` environment variable needs to be set to `true`. When `ingress.enabled` is set to `true` this is already automatically done.
+
+In some configurations it is desirable to change the base path for the OPC Router web management. This always requires setting the `WEB_BASE_PATH` environment variable to the new base path for the OPC Router web management to properly function.
+
+For configuring environment variables, refer to [Adding extra environment variables](#adding-extra-environment-variables).
 
 ## **Redundancy mode**
-The opc router and mongodb deployed by the chart can both be configured to run in redundancy mode, offering increased protection against hardware failures.
+The OPC Router and mongodb deployed by the chart can both be configured to run in redundancy mode, offering increased protection against hardware failures.
 
 ### **OPC Router redudancy mode**
-Setting the opc router into redundancy mode will cause a second pod with a opc router runtime container to be deployed. This container will load the same project as the main container, but will remain dorment until the main container is unreachable.
+Setting the OPC Router into redundancy mode will cause a second pod with a OPC Router runtime container to be deployed. This container will load the same project as the main container, but will remain dorment until the main container is unreachable.
 
-The redundancy mode for the opc router is currently not availible and will be enabled at a later date.
+The redundancy mode for the OPC Router is currently not availible and will be enabled at a later date.
 
 ### **MongoDB redundancy mode**
 By setting the replica count of the mongodb above one, additional pods running the mongodb containers are created. These mongodb containers will connect and copy the primary container, but aren't accessible themself. When the primary container becomes unreachable, a new primary container will be elected, taking its place.
@@ -165,7 +183,7 @@ By setting the replica count of the mongodb above one, additional pods running t
 Keep in mind that currently when the primary mongodb changes, external connection to the application can get lost until the original primary pod is again the primary pod.
 
 ## **Loading a project from a git repository**
-Please refer to [this sample project](https://github.com/OPC-Router/helm-sample-project) on general information of how to deploy a opc router project from a git repository onto a kubernetes cluster using this helm chart.
+Please refer to [this sample project](https://github.com/OPC-Router/helm-sample-project) on general information of how to deploy a OPC Router project from a git repository onto a kubernetes cluster using this helm chart.
 
 ## **Adding extra environment variables**
 
