@@ -129,11 +129,13 @@ spec:
       {{- if .Values.project.projectRepo }}
         {{- if not .Values.project.autoUpdate.disable }}
         - name: kubernetes-proxy
-          image: bitnami/kubectl:latest
+          image: "{{ .Values.project.autoUpdate.kubectlImage.repository }}:{{ .Values.project.autoUpdate.kubectlImage.tag }}"
+          imagePullPolicy: {{ .Values.project.autoUpdate.kubectlImage.pullPolicy }}
           # Script for setting ssh credentials and cloning the repository onto the volume
           command: ['sh', '-c', "kubectl proxy;"]
         - name: git-ops
-          image: alpine/git:latest
+          image: "{{ .Values.project.gitImage.repository }}:{{ .Values.project.gitImage.tag }}"
+          imagePullPolicy: {{ .Values.project.gitImage.pullPolicy }}
           # Script for setting ssh credentials and cloning the repository onto the volume
           command: ["sh", "-c"]
           args:
@@ -152,7 +154,8 @@ spec:
       # Init container for pulling the project files
       initContainers:
       - name: pull-project
-        image: alpine/git:latest
+        image: "{{ .Values.project.gitImage.repository }}:{{ .Values.project.gitImage.tag }}"
+        imagePullPolicy: {{ .Values.project.gitImage.pullPolicy }}
         # Script for setting ssh credentials and cloning the repository onto the volume
         command: ["sh", "-c"]
         args:
