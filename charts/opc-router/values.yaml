@@ -213,11 +213,21 @@ project:
   projectPath: 
   # Path to the projects configuration file. Optional. Not providing it results in no configuration file being loaded.
   configPath: 
+  # Settings for the used git image
+  gitImage:
+    repository: alpine/git
+    pullPolicy: IfNotPresent
+    tag: latest
   autoUpdate:
     # If false, the project will be automatically updated when it changes in the repository. Experimental.
     disable: true
     # Interval in seconds the git repository gets fetched to check for updates
     interval: 300
+    # Settings for the used kubectl image
+    kubectlImage:
+      repository: bitnami/kubectl
+      pullPolicy: IfNotPresent
+      tag: latest
   auth:
     # An existing secret containing the ssh-key under the key 'ssh-privatekey'. Optional.
     # Must be in the same namespace as this application. Takes priority over ssh_key.
