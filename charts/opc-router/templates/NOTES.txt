@@ -34,11 +34,12 @@ WARNING: The web management has no login (webManagement.auth.disable=true). Whoe
 can change the router's configuration. Set webManagement.auth.disable=false and an initial user
 to require a login.
 {{- end }}
-{{- if and .Values.project.projectRepo (eq (.Values.project.importMode | default "clear") "clear") }}
+{{- if and .Values.project.projectRepo (eq (.Values.project.importMode | default "overwrite") "clear") }}
 
-WARNING: The project is imported with project.importMode=clear. OPC Router 5.5 to 5.7, the chart's
-default image among them, stop at this step and the web management does not start. Set
-project.importMode=overwrite for these versions.
+WARNING: The project is imported with project.importMode=clear. OPC Router 5.5 from 5.5.6007 on, 5.6
+and 5.7 stop at this step and the web management never starts. The chart refuses these versions when
+image.tag names them; with a tag such as latest or one of your own, make sure it is none of them, or
+set project.importMode=overwrite.
 {{- end }}
 {{- else }}
 The chart was successfully installed but the opc-router container won't run:

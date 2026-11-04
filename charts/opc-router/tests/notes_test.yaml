@@ -67,16 +67,19 @@ tests:
       - notMatchRegexRaw:
           pattern: WARNING
 
-  - it: warns that the clear import stops the default image's web management
+  - it: warns that a clear import stops the web management of some versions
     set:
       I_do_accept_the_EULA: true
+      image:
+        tag: latest
       project:
         projectRepo: https://example.com/project.git
+        importMode: clear
     asserts:
       - matchRegexRaw:
           pattern: "WARNING: The project is imported with project.importMode=clear"
 
-  - it: does not warn about the import in overwrite mode or without a project
+  - it: does not warn about the import by default
     set:
       I_do_accept_the_EULA: true
       webManagement:
@@ -84,7 +87,19 @@ tests:
           disable: false
       project:
         projectRepo: https://example.com/project.git
-        importMode: overwrite
+    asserts:
+      - notMatchRegexRaw:
+          pattern: WARNING
+
+  - it: does not warn about the import when an upgrade reused values without the mode
+    set:
+      I_do_accept_the_EULA: true
+      webManagement:
+        auth:
+          disable: false
+      project:
+        projectRepo: https://example.com/project.git
+        importMode: null
     asserts:
       - notMatchRegexRaw:
           pattern: WARNING

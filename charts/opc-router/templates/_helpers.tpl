@@ -99,6 +99,27 @@ then repeat the upgrade. To keep a rolling update instead, set updateStrategy.ty
 {{- end }}
 
 {{/*
+Stops project.importMode=clear on the router images whose import cannot clear: from 5.5.6007 on, 5.6
+and 5.7. The 5.5 hotfixes before 5.5.6007 are left out because nothing shows whether they carry the
+defect. Any other tag keeps the warning of the installation notes.
+*/}}
+{{- define "opc-router.importClearGuard" -}}
+{{- $tag := toString (.Values.image.tag | default .Chart.AppVersion) -}}
+{{- $stops := regexMatch `^5\.[67]([.-]|$)` $tag -}}
+{{- if regexMatch `^5\.5(-(amd64|arm64|arm|ferretdb))*$` $tag -}}
+{{- $stops = true -}}
+{{- end -}}
+{{- if regexMatch `^5\.5\.[0-9]+\.` $tag -}}
+{{- if ge (atoi (index (splitList "." $tag) 2)) 6007 -}}
+{{- $stops = true -}}
+{{- end -}}
+{{- end -}}
+{{- if $stops -}}
+{{- fail (printf "project.importMode=clear cannot work with the router image %s: OPC Router 5.5 from 5.5.6007 on, 5.6 and 5.7 stop while clearing the configuration, and the web management never starts. Nothing has been changed. Use project.importMode=overwrite, the default." $tag) -}}
+{{- end -}}
+{{- end }}
+
+{{/*
 Labels of the router pod: the selector labels, completed by the common labels. Where both name the
 same key, the selector's value wins, so a kept selector still matches its pods.
 */}}

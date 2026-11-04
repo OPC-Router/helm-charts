@@ -109,11 +109,12 @@ spec:
           {{- if .Values.project.projectRepo }}
           - name: OR_IMPORT_SOURCE
             value: "/data/project/{{ .Values.project.projectPath }}"
-          {{- $importMode := .Values.project.importMode | default "clear" }}
+          {{- $importMode := .Values.project.importMode | default "overwrite" }}
           {{- if eq $importMode "overwrite" }}
           - name: OR_IMPORT_OVERWRITE_EXISTING
             value: "true"
           {{- else if eq $importMode "clear" }}
+          {{- include "opc-router.importClearGuard" . }}
           - name: OR_IMPORT_ALLOW_CLEAR_CONFIG
             value: "true"
           {{- else }}

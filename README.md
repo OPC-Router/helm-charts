@@ -151,10 +151,16 @@ and its database. It changes the following:
   `registry.k8s.io/kubectl:v1.33.0` (before: `alpine/git:latest`, `bitnami/kubectl:latest`). A cluster
   that pulls through a mirror or cannot reach `registry.k8s.io` needs them there, or keeps the old ones
   with `project.gitImage` and `project.autoUpdate.kubectlImage`.
+- **A project from a git repository is imported over the existing configuration** (before: the
+  configuration was deleted first). What the project contains replaces what is there; what was deleted
+  from the project stays in the router until it is deleted there. The old way is
+  `project.importMode=clear`, which the chart refuses with OPC Router 5.5 from 5.5.6007 on, 5.6 and 5.7:
+  their import stops at that step (a known defect). See
+  [Loading a project from a git repository](#loading-a-project-from-a-git-repository).
 - `helm test` asks the runtime's readiness route and fails while the runtime is not ready.
 - A new installation gets volume sizes that fit how the router runs; an existing claim keeps its size.
 - New, all off by default: extra ports, environment variables, volumes and init containers,
-  resources for every container, a project import mode and a rotation of the embedded database's log.
+  resources for every container and a rotation of the embedded database's log.
 
 The upgrade replaces the router pod once, because its pod template changes. With the bundled MongoDB,
 a MongoDB pod that still runs another image restarts once on the new one (about 40 seconds on our test
@@ -261,9 +267,9 @@ supports MongoDB from 4.2 on and recommends 6.0 or later, which a later chart ve
 Before you upgrade:
 - **Back up first.** Export the project. With the embedded database, the first start of 5.7 migrates
   the database to MongoDB 8, and the 5.3 image cannot open it afterwards.
-- **Project import:** with a project from a git repository, set `project.importMode=overwrite` in the
-  same upgrade. The default `clear` stops the web management of OPC Router 5.5, 5.6 and 5.7 from
-  starting (a known defect): the pod keeps running, and nothing answers. See
+- **Project import:** a project from a git repository is imported with `overwrite` now. Do not set
+  `project.importMode=clear`: it stops the web management of OPC Router 5.7 from starting (a known
+  defect), and the chart refuses it. See
   [Loading a project from a git repository](#loading-a-project-from-a-git-repository).
 - **If you set `updateStrategy` to `RollingUpdate`, remove it for this upgrade**, so that 5.3 and 5.7 do
   not run side by side on one database; the chart's default `Recreate` avoids that.
@@ -274,8 +280,6 @@ For example with these lines in your values file `my-values.yaml`:
 ```yaml
 image:
   tag: "5.7.5000.16"
-project:
-  importMode: overwrite      # only with a project from a git repository
 ```
 ```shell
 helm upgrade my-opcrouter opc-router/opc-router --version 1.1.0 --reset-then-reuse-values -f my-values.yaml
@@ -413,7 +417,7 @@ the image of the volume permissions container, `bitnami/bitnami-shell`, has no r
 | `project.projectRepo`                      | URL to the git repository of an OPC Router project. Optional. Empty means no project gets loaded.    | `""`                      |
 | `project.projectPath`                      | Path to the project .rpe file in the repository. Don't begin with '/'. Optional.                     | `""`                      |
 | `project.configPath`                       | Path to a projects configuration file. Optional. Empty means no configuration file gets loaded.      | `""`                      |
-| `project.importMode`                       | `clear` or `overwrite`, see [Loading a project](#loading-a-project-from-a-git-repository).           | `clear`                   |
+| `project.importMode`                       | `overwrite` or `clear`, see [Loading a project](#loading-a-project-from-a-git-repository).           | `overwrite`               |
 | `project.gitImage.*`                       | `repository`, `tag`, `pullPolicy` of the image that clones the project.                              | `alpine/git`, `v2.47.2`   |
 | `project.autoUpdate.disable`               | If false, the project is updated when it changes in the repository. Experimental.                    | `true`                    |
 | `project.autoUpdate.interval`              | Interval in seconds the repository is fetched.                                                       | `300`                     |
@@ -679,11 +683,13 @@ does not deploy yet.
 Please refer to [this sample project](https://github.com/OPC-Router/helm-sample-project) on general information of how to deploy a OPC Router project from a git repository onto a kubernetes cluster using this helm chart.
 
 At every start the router imports the project. `project.importMode` decides how:
-- `clear` (default) deletes the configuration first, so the router runs exactly the project. OPC Router
-  5.5, 5.6, 5.7 and 5.4 builds after 5.4.6009 stop at this step and the web management never starts
-  (a known defect); use `overwrite` with them, and so with the chart's default image 5.7.
-- `overwrite` imports the project over the existing configuration: what the project contains replaces
-  what is there, everything else stays. It needs OPC Router 5.1.5001 or later.
+- `overwrite` (default) imports the project over the existing configuration: what the project contains
+  replaces what is there, everything else stays. Something deleted from the project therefore stays in
+  the router until it is deleted there. It needs OPC Router 5.1.5001 or later.
+- `clear` deletes the configuration first, so the router runs exactly the project. OPC Router 5.5 from
+  5.5.6007 on, 5.6 and 5.7 stop at this step and the web management never starts (a known defect).
+  The chart refuses `clear` when `image.tag` names one of these versions, before anything is changed;
+  with another tag, such as `latest` or one of your own, it warns after the installation.
 
 With `project.autoUpdate.disable=false` a container fetches the repository every
 `project.autoUpdate.interval` seconds and restarts the router when the project has changed. At its

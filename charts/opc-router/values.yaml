@@ -322,13 +322,14 @@ project:
   # Path to the projects configuration file. Optional. Not providing it results in no configuration file being loaded.
   configPath:
   # How the project replaces the router's configuration at every start:
-  #   clear      deletes the configuration first, then imports the project, so the router runs
-  #              exactly the project. Known defect: OPC Router 5.5, 5.6, 5.7 (the chart's default
-  #              image) and 5.4 builds after 5.4.6009 stop at this step and the web management never
-  #              starts; use overwrite there.
   #   overwrite  imports the project over the existing configuration: what the project contains
-  #              replaces what is there, everything else stays. Needs OPC Router 5.1.5001 or later.
-  importMode: clear
+  #              replaces what is there, everything else stays, also what was deleted from the
+  #              project. Needs OPC Router 5.1.5001 or later.
+  #   clear      deletes the configuration first, then imports the project, so the router runs
+  #              exactly the project. Known defect: OPC Router 5.5 from 5.5.6007 on, 5.6 and 5.7 (the
+  #              chart's default image) stop at this step and the web management never starts; the
+  #              chart refuses clear when image.tag names one of them.
+  importMode: overwrite
   # Settings for the used git image (needs a shell and git)
   gitImage:
     repository: alpine/git
