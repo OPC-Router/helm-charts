@@ -1,0 +1,60 @@
+name: Lint and Test Charts
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  lint-test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        helm: [v3.22.0, v4.3.0]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v5
+        with:
+          version: ${{ matrix.helm }}
+
+      - name: Set up chart-testing
+        if: startsWith(matrix.helm, 'v3')
+        uses: helm/chart-testing-action@v2.8.0
+
+      - name: Install kubeconform
+        env:
+          KUBECONFORM_VERSION: v0.8.0
+        run: |
+          mkdir -p "${RUNNER_TEMP}/bin"
+          cd "${RUNNER_TEMP}"
+          base="https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}"
+          curl -sSLfO "${base}/kubeconform-linux-amd64.tar.gz"
+          curl -sSLfO "${base}/CHECKSUMS"
+          sha256sum --check --ignore-missing CHECKSUMS
+          tar -xzf kubeconform-linux-amd64.tar.gz -C "${RUNNER_TEMP}/bin" kubeconform
+          echo "${RUNNER_TEMP}/bin" >> "${GITHUB_PATH}"
+
+      - name: Lint changed charts (chart-testing)
+        if: startsWith(matrix.helm, 'v3')
+        run: ct lint --config .github/ct.yaml --target-branch ${{ github.event.repository.default_branch }}
+
+      - name: Install helm-unittest
+        if: startsWith(matrix.helm, 'v3')
+        run: helm plugin install https://github.com/helm-unittest/helm-unittest --version v1.2.0
+
+      - name: Unit tests
+        if: startsWith(matrix.helm, 'v3')
+        run: helm unittest charts/opc-router
+
+      - name: Lint, render and validate every CI values file
+        run: .github/scripts/render-matrix.sh

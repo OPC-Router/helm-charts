@@ -1,0 +1,79 @@
+suite: update strategy and startup failure behaviour
+templates:
+  - templates/deployment.yaml
+tests:
+  # The router's ReadWriteOnce volumes stall a rolling update on another node in every mode.
+  - it: replaces the pod with Recreate with a separate MongoDB too
+    asserts:
+      - equal:
+          path: spec.strategy.type
+          value: Recreate
+      - exists:
+          path: spec.strategy.rollingUpdate
+      - isNullOrEmpty:
+          path: spec.strategy.rollingUpdate
+
+  - it: uses a rolling update only when asked for
+    set:
+      updateStrategy:
+        type: RollingUpdate
+    asserts:
+      - equal:
+          path: spec.strategy
+          value:
+            type: RollingUpdate
+
+  - it: replaces the pod with Recreate when the router embeds its database
+    set:
+      mongodb:
+        deploy: false
+    asserts:
+      - equal:
+          path: spec.strategy.type
+          value: Recreate
+      # Present and null, so that a switch from RollingUpdate removes the defaulted block.
+      - exists:
+          path: spec.strategy.rollingUpdate
+      - isNullOrEmpty:
+          path: spec.strategy.rollingUpdate
+
+  - it: uses an explicitly configured strategy
+    set:
+      updateStrategy:
+        type: RollingUpdate
+        rollingUpdate:
+          maxSurge: 0
+          maxUnavailable: 1
+    asserts:
+      - equal:
+          path: spec.strategy
+          value:
+            type: RollingUpdate
+            rollingUpdate:
+              maxSurge: 0
+              maxUnavailable: 1
+
+  - it: stops the container on a failed startup step by default
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: S6_BEHAVIOUR_IF_STAGE2_FAILS
+            value: "2"
+
+  - it: does not add the variable twice when envVars already sets it
+    set:
+      envVars:
+        - S6_BEHAVIOUR_IF_STAGE2_FAILS: "0"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: S6_BEHAVIOUR_IF_STAGE2_FAILS
+            value: "0"
+          count: 1
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: S6_BEHAVIOUR_IF_STAGE2_FAILS
+            value: "2"

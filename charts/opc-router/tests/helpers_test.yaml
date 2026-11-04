@@ -1,0 +1,81 @@
+suite: helper containers and the connection test
+templates:
+  - templates/deployment.yaml
+  - templates/tests/test-connection.yaml
+tests:
+  - it: uses pinned helper images and starts the kubectl proxy without a shell
+    template: templates/deployment.yaml
+    set:
+      project:
+        projectRepo: https://example.com/project.git
+        autoUpdate:
+          disable: false
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].image
+          value: alpine/git:v2.47.2
+      - equal:
+          path: spec.template.spec.containers[1].image
+          value: registry.k8s.io/kubectl:v1.33.0
+      - equal:
+          path: spec.template.spec.containers[1].args
+          value: ["proxy"]
+      - notExists:
+          path: spec.template.spec.containers[1].command
+
+  - it: puts helperResources on every helper container
+    template: templates/deployment.yaml
+    set:
+      project:
+        projectRepo: https://example.com/project.git
+        autoUpdate:
+          disable: false
+      helperResources:
+        limits:
+          cpu: 100m
+          memory: 128Mi
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].resources.limits.memory
+          value: 128Mi
+      - equal:
+          path: spec.template.spec.containers[1].resources.limits.memory
+          value: 128Mi
+      - equal:
+          path: spec.template.spec.containers[2].resources.limits.memory
+          value: 128Mi
+
+  - it: checks the runtime's health route in the connection test
+    template: templates/tests/test-connection.yaml
+    release:
+      name: r1
+    asserts:
+      - equal:
+          path: spec.containers[0].image
+          value: busybox:1.37
+      - matchRegex:
+          path: spec.containers[0].args[0]
+          pattern: ^wget -q -O - http://r1-opc-router:8443/health/runtime/ready$
+
+  - it: still renders the connection test when a reused release has no tests values
+    template: templates/tests/test-connection.yaml
+    set:
+      tests: null
+    asserts:
+      - equal:
+          path: spec.containers[0].image
+          value: busybox:1.37
+      - notExists:
+          path: spec.containers[0].resources
+
+  - it: gives the connection test its resources
+    template: templates/tests/test-connection.yaml
+    set:
+      tests:
+        resources:
+          limits:
+            memory: 32Mi
+    asserts:
+      - equal:
+          path: spec.containers[0].resources.limits.memory
+          value: 32Mi

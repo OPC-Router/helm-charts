@@ -1,0 +1,172 @@
+suite: extension points
+templates:
+  - templates/deployment.yaml
+  - templates/services/service.yaml
+tests:
+  - it: adds nothing by default
+    template: templates/deployment.yaml
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.containers[0].ports
+          count: 1
+      - lengthEqual:
+          path: spec.template.spec.volumes
+          count: 2
+      - notExists:
+          path: spec.template.spec.initContainers
+
+  - it: opens an extra port on the container and the service
+    set:
+      service:
+        extraPorts:
+          - name: opcua
+            port: 49420
+    asserts:
+      - template: templates/deployment.yaml
+        contains:
+          path: spec.template.spec.containers[0].ports
+          content:
+            name: opcua
+            containerPort: 49420
+            protocol: TCP
+      - template: templates/services/service.yaml
+        contains:
+          path: spec.ports
+          content:
+            name: opcua
+            port: 49420
+            targetPort: opcua
+            protocol: TCP
+
+  - it: maps a service port to another container port, with protocol and node port
+    set:
+      service:
+        type: NodePort
+        extraPorts:
+          - name: listener
+            port: 3300
+            targetPort: 33000
+            protocol: UDP
+            nodePort: 31300
+    asserts:
+      - template: templates/deployment.yaml
+        contains:
+          path: spec.template.spec.containers[0].ports
+          content:
+            name: listener
+            containerPort: 33000
+            protocol: UDP
+      - template: templates/services/service.yaml
+        contains:
+          path: spec.ports
+          content:
+            name: listener
+            port: 3300
+            nodePort: 31300
+            targetPort: listener
+            protocol: UDP
+
+  - it: refuses an extra port without a name
+    template: templates/deployment.yaml
+    set:
+      service:
+        extraPorts:
+          - port: 49420
+    asserts:
+      - failedTemplate:
+          errorPattern: service.extraPorts needs a name
+
+  - it: takes an environment variable from a secret
+    template: templates/deployment.yaml
+    set:
+      extraEnv:
+        - name: INITIAL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: initial-user
+              key: password
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: INITIAL_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: initial-user
+                key: password
+
+  - it: does not add the startup failure variable twice when extraEnv sets it
+    template: templates/deployment.yaml
+    set:
+      extraEnv:
+        - name: S6_BEHAVIOUR_IF_STAGE2_FAILS
+          value: "0"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: S6_BEHAVIOUR_IF_STAGE2_FAILS
+            value: "0"
+          count: 1
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: S6_BEHAVIOUR_IF_STAGE2_FAILS
+            value: "2"
+
+  - it: mounts an extra volume into the router container
+    template: templates/deployment.yaml
+    set:
+      extraVolumes:
+        - name: odbc
+          configMap:
+            name: odbc-ini
+      extraVolumeMounts:
+        - name: odbc
+          mountPath: /etc/odbc.ini
+          subPath: odbc.ini
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: odbc
+            configMap:
+              name: odbc-ini
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: odbc
+            mountPath: /etc/odbc.ini
+            subPath: odbc.ini
+
+  - it: runs an extra init container on its own with a separate MongoDB
+    template: templates/deployment.yaml
+    set:
+      extraInitContainers:
+        - name: wait
+          image: busybox:1.37
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.initContainers
+          count: 1
+      - equal:
+          path: spec.template.spec.initContainers[0].name
+          value: wait
+
+  - it: runs extra init containers after the chart's own
+    template: templates/deployment.yaml
+    set:
+      mongodb:
+        deploy: false
+      project:
+        projectRepo: https://example.com/project.git
+      extraInitContainers:
+        - name: wait
+          image: busybox:1.37
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.initContainers
+          count: 3
+      - equal:
+          path: spec.template.spec.initContainers[2].name
+          value: wait

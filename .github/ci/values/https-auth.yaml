@@ -1,0 +1,12 @@
+# Web management over HTTPS with login and an initial user (CI-only placeholder values, no secrets)
+I_do_accept_the_EULA: true
+webManagement:
+  https:
+    disable: false
+    cert: ci-only-placeholder-certificate
+    key: ci-only-placeholder-key
+  auth:
+    disable: false
+    initialUser:
+      name: ci-admin
+      password: ci-only-placeholder

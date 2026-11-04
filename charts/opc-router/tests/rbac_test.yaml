@@ -1,0 +1,108 @@
+suite: permissions of the router
+templates:
+  - templates/rbac.yaml
+  - templates/deployment.yaml
+release:
+  name: r1
+  namespace: ns1
+tests:
+  - it: creates no role or binding without the project auto-update
+    template: templates/rbac.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: mounts no API token into the router pod without the project auto-update
+    template: templates/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: false
+
+  - it: grants the auto-update only listing and deleting pods in its namespace
+    template: templates/rbac.yaml
+    set:
+      project:
+        projectRepo: https://example.com/project.git
+        autoUpdate:
+          disable: false
+    asserts:
+      - hasDocuments:
+          count: 2
+      - documentIndex: 0
+        isKind:
+          of: Role
+      - documentIndex: 0
+        equal:
+          path: rules
+          value:
+            - apiGroups: [""]
+              resources: ["pods"]
+              verbs: ["list", "deletecollection"]
+      - documentIndex: 1
+        isKind:
+          of: RoleBinding
+      - documentIndex: 1
+        equal:
+          path: roleRef
+          value:
+            apiGroup: rbac.authorization.k8s.io
+            kind: Role
+            name: r1-opc-router-restart
+
+  - it: grants nothing to the namespace's default account
+    template: templates/rbac.yaml
+    set:
+      serviceAccount:
+        create: false
+      project:
+        projectRepo: https://example.com/project.git
+        autoUpdate:
+          disable: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: binds the role to a named account the chart does not create
+    template: templates/rbac.yaml
+    set:
+      serviceAccount:
+        create: false
+        name: router-account
+      project:
+        projectRepo: https://example.com/project.git
+        autoUpdate:
+          disable: false
+    asserts:
+      - documentIndex: 1
+        equal:
+          path: subjects[0].name
+          value: router-account
+
+  - it: mounts the API token when the project auto-update needs it
+    template: templates/deployment.yaml
+    set:
+      project:
+        projectRepo: https://example.com/project.git
+        autoUpdate:
+          disable: false
+    asserts:
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: true
+
+  # The role may delete every pod of the namespace; the restart itself must stay with this release.
+  - it: restarts only the pods of its own release after a new commit
+    template: templates/deployment.yaml
+    set:
+      project:
+        projectRepo: https://example.com/project.git
+        autoUpdate:
+          disable: false
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[2].name
+          value: git-ops
+      - matchRegex:
+          path: spec.template.spec.containers[2].args[0]
+          pattern: /namespaces/ns1/pods\?labelSelector=app.kubernetes.io/name=opc-router,app.kubernetes.io/instance=r1"

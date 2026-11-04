@@ -1,0 +1,10 @@
+# chart-testing configuration, see https://github.com/helm/chart-testing
+chart-dirs:
+  - charts
+target-branch: main
+validate-maintainers: false
+check-version-increment: true
+# Repository of the MongoDB subchart; helm dependency build refuses a dependency whose repository
+# is not configured.
+chart-repos:
+  - bitnami-archive=https://raw.githubusercontent.com/bitnami/charts/archive-full-index/bitnami

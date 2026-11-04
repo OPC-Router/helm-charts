@@ -1,0 +1,253 @@
+suite: project import
+templates:
+  - templates/deployment.yaml
+tests:
+  - it: imports nothing without a project repository
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OR_IMPORT_ALLOW_CLEAR_CONFIG
+            value: "true"
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OR_IMPORT_OVERWRITE_EXISTING
+            value: "true"
+
+  - it: imports over the existing configuration by default
+    set:
+      project:
+        projectRepo: https://example.com/project.git
+        projectPath: Sampleproject.rpe
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OR_IMPORT_OVERWRITE_EXISTING
+            value: "true"
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OR_IMPORT_ALLOW_CLEAR_CONFIG
+            value: "true"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OR_IMPORT_SOURCE
+            value: /data/project/Sampleproject.rpe
+
+  - it: imports over the existing configuration when an upgrade reused values without the mode
+    set:
+      project:
+        projectRepo: https://example.com/project.git
+        importMode: null
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OR_IMPORT_OVERWRITE_EXISTING
+            value: "true"
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OR_IMPORT_ALLOW_CLEAR_CONFIG
+            value: "true"
+
+  - it: clears the configuration before the import on a version that can
+    set:
+      image:
+        tag: "5.3"
+      project:
+        projectRepo: https://example.com/project.git
+        importMode: clear
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OR_IMPORT_ALLOW_CLEAR_CONFIG
+            value: "true"
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OR_IMPORT_OVERWRITE_EXISTING
+            value: "true"
+
+  - it: refuses to clear with the default image
+    set:
+      project:
+        projectRepo: https://example.com/project.git
+        importMode: clear
+    asserts:
+      - failedTemplate:
+          errorPattern: "project.importMode=clear cannot work with the router image 5.7: .* Use project.importMode=overwrite"
+
+  - it: refuses to clear with a 5.7 build of one architecture
+    set:
+      image:
+        tag: "5.7.5001.18-arm64"
+      project:
+        projectRepo: https://example.com/project.git
+        importMode: clear
+    asserts:
+      - failedTemplate:
+          errorPattern: "cannot work with the router image 5.7.5001.18-arm64:"
+
+  - it: refuses to clear with a 5.6 build
+    set:
+      image:
+        tag: "5.6.5010.14"
+      project:
+        projectRepo: https://example.com/project.git
+        importMode: clear
+    asserts:
+      - failedTemplate:
+          errorPattern: "cannot work with the router image 5.6.5010.14:"
+
+  - it: refuses to clear with the moving 5.6 tag written as a number
+    set:
+      image:
+        tag: 5.6
+      project:
+        projectRepo: https://example.com/project.git
+        importMode: clear
+    asserts:
+      - failedTemplate:
+          errorPattern: "cannot work with the router image 5.6:"
+
+  - it: refuses to clear with the moving 5.5 tag
+    set:
+      image:
+        tag: "5.5"
+      project:
+        projectRepo: https://example.com/project.git
+        importMode: clear
+    asserts:
+      - failedTemplate:
+          errorPattern: "cannot work with the router image 5.5:"
+
+  - it: refuses to clear with the moving 5.5 tag of one architecture and database
+    set:
+      image:
+        tag: "5.5-amd64-ferretdb"
+      project:
+        projectRepo: https://example.com/project.git
+        importMode: clear
+    asserts:
+      - failedTemplate:
+          errorPattern: "cannot work with the router image 5.5-amd64-ferretdb:"
+
+  - it: refuses to clear with the first 5.5 hotfix that cannot
+    set:
+      image:
+        tag: "5.5.6007.44"
+      project:
+        projectRepo: https://example.com/project.git
+        importMode: clear
+    asserts:
+      - failedTemplate:
+          errorPattern: "cannot work with the router image 5.5.6007.44:"
+
+  - it: refuses to clear with a later 5.5 hotfix of one architecture
+    set:
+      image:
+        tag: "5.5.6011.88-arm"
+      project:
+        projectRepo: https://example.com/project.git
+        importMode: clear
+    asserts:
+      - failedTemplate:
+          errorPattern: "cannot work with the router image 5.5.6011.88-arm:"
+
+  - it: clears with a 5.5 hotfix before 5.5.6007, which the chart cannot tell
+    set:
+      image:
+        tag: "5.5.6006.135"
+      project:
+        projectRepo: https://example.com/project.git
+        importMode: clear
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OR_IMPORT_ALLOW_CLEAR_CONFIG
+            value: "true"
+
+  - it: clears with the last 5.5 release
+    set:
+      image:
+        tag: "5.5.5009.204"
+      project:
+        projectRepo: https://example.com/project.git
+        importMode: clear
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OR_IMPORT_ALLOW_CLEAR_CONFIG
+            value: "true"
+
+  - it: clears with the moving 5.4 tag
+    set:
+      image:
+        tag: "5.4"
+      project:
+        projectRepo: https://example.com/project.git
+        importMode: clear
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OR_IMPORT_ALLOW_CLEAR_CONFIG
+            value: "true"
+
+  - it: clears with the last 5.4 build
+    set:
+      image:
+        tag: "5.4.6009.313"
+      project:
+        projectRepo: https://example.com/project.git
+        importMode: clear
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OR_IMPORT_ALLOW_CLEAR_CONFIG
+            value: "true"
+
+  - it: clears with latest, which moves
+    set:
+      image:
+        tag: latest
+      project:
+        projectRepo: https://example.com/project.git
+        importMode: clear
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OR_IMPORT_ALLOW_CLEAR_CONFIG
+            value: "true"
+
+  - it: clears with a tag of one's own
+    set:
+      image:
+        tag: my-build
+      project:
+        projectRepo: https://example.com/project.git
+        importMode: clear
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OR_IMPORT_ALLOW_CLEAR_CONFIG
+            value: "true"
+
+  - it: refuses an unknown mode
+    set:
+      project:
+        projectRepo: https://example.com/project.git
+        importMode: merge
+    asserts:
+      - failedTemplate:
+          errorPattern: project.importMode must be clear or overwrite, not merge

@@ -21,3 +21,5 @@
 .idea/
 *.tmproj
 .vscode/
+# Unit tests are not part of the chart package (anchored: templates/tests/ must stay)
+/tests/

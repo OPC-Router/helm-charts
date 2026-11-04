@@ -1,4 +1,7 @@
 {{- if .Values.claims.inray.storageVolume.createVolume }}
+{{- if and (eq (toString .Values.claims.inray.storageVolume.volumeType) "local") (not .Values.claims.inray.storageVolume.nodeAffinity) }}
+{{- fail "claims.inray.storageVolume.nodeAffinity is required with volumeType local, because Kubernetes ties a local volume to one node: name the node there, or set createVolume=false and let a StorageClass provide the volume." }}
+{{- end }}
 apiVersion: v1
 kind: PersistentVolume
 metadata:
@@ -11,7 +14,7 @@ spec:
   storageClassName: {{ . }}
   {{- end }}
   capacity: 
-    storage: {{ .Values.claims.inray.capacity }}
+    storage: {{ include "opc-router.claimCapacity" (list . "inray") }}
   accessModes:
     - ReadWriteOnce
   persistentVolumeReclaimPolicy: {{ .Values.claims.inray.storageVolume.reclaimPolicy }}

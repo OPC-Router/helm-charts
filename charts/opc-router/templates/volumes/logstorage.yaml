@@ -1,4 +1,7 @@
 {{- if .Values.claims.log.storageVolume.createVolume }}
+{{- if and (eq (toString .Values.claims.log.storageVolume.volumeType) "local") (not .Values.claims.log.storageVolume.nodeAffinity) }}
+{{- fail "claims.log.storageVolume.nodeAffinity is required with volumeType local, because Kubernetes ties a local volume to one node: name the node there, or set createVolume=false and let a StorageClass provide the volume." }}
+{{- end }}
 apiVersion: v1
 kind: PersistentVolume
 metadata:
@@ -11,7 +14,7 @@ spec:
   storageClassName: {{ . }}
   {{- end }}
   capacity: 
-    storage: {{ .Values.claims.log.capacity }}
+    storage: {{ include "opc-router.claimCapacity" (list . "log") }}
   accessModes:
     - ReadWriteOnce
   persistentVolumeReclaimPolicy: {{ .Values.claims.log.storageVolume.reclaimPolicy }}

@@ -5,12 +5,15 @@ on:
     branches:
       - main
 
+permissions:
+  contents: write
+
 jobs:
   release:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -20,17 +23,36 @@ jobs:
           git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
 
       - name: Install Helm
-        uses: azure/setup-helm@v1
+        uses: azure/setup-helm@v5
         with:
-          version: v3.4.0
-      
-      - name: Helm Deps
+          version: v3.22.0
+
+      # Charts are packaged with the dependencies vendored in the repository, so a release does
+      # not depend on a third-party chart index. Versions that are already tagged are skipped.
+      - name: Package unreleased chart versions
+        id: package
         run: |
-          helm repo add bitnami https://raw.githubusercontent.com/bitnami/charts/archive-full-index/bitnami
-          for dir in $(ls -d charts/*); do
-            helm dependency update $dir;
+          mkdir -p .cr-release-packages
+          for dir in charts/*/; do
+            name=$(helm show chart "$dir" | awk '/^name:/ {print $2}')
+            version=$(helm show chart "$dir" | awk '/^version:/ {print $2}')
+            if git rev-parse -q --verify "refs/tags/${name}-${version}" > /dev/null; then
+              echo "${name} ${version} is already released"
+              continue
+            fi
+            helm package "$dir" --destination .cr-release-packages
           done
+          if ls .cr-release-packages/*.tgz > /dev/null 2>&1; then
+            echo "packaged=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "packaged=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Run chart-releaser
-        uses: helm/chart-releaser-action@v1.2.1
+        if: steps.package.outputs.packaged == 'true'
+        uses: helm/chart-releaser-action@v1.7.0
+        with:
+          skip_packaging: true
+          skip_existing: true
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"

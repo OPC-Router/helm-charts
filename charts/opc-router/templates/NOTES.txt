@@ -1,3 +1,9 @@
+{{- $scheme := "https" }}
+{{- $localPort := 8443 }}
+{{- if .Values.webManagement.https.disable }}
+{{- $scheme = "http" }}
+{{- $localPort = 8080 }}
+{{- end }}
 {{- if .Values.I_do_accept_the_EULA }}
 Get the application URL by running these commands in a BASH shell:
 {{- if .Values.ingress.enabled }}
@@ -12,17 +18,28 @@ Get the application URL by running these commands in a BASH shell:
       NOTE: Extracted NodePort address may not be correct or reachable in some configurations.
   export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "opc-router.fullname" . }})
   export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
-  echo $NODE_IP:$NODE_PORT
+  echo {{ $scheme }}://$NODE_IP:$NODE_PORT
 {{- else if contains "LoadBalancer" .Values.service.type }}
      NOTE: It may take a few minutes for the LoadBalancer IP to be available.
            You can watch the status of by running 'kubectl get --namespace {{ .Release.Namespace }} svc -w {{ include "opc-router.fullname" . }}'
-  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ if .Values.mongodb.deploy }}{{ .Release.Name }}-mongodb-0-external{{ else }}{{ include "opc-router.fullname" . }}{{ end }} --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
-  echo $SERVICE_IP:{{ .Values.mongodb.externalAccess.service.port }}
+  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "opc-router.fullname" . }} --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
+  echo {{ $scheme }}://$SERVICE_IP:{{ .Values.service.port }}
 {{- else if contains "ClusterIP" .Values.service.type }}
-  export POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "opc-router.name" . }},app.kubernetes.io/instance={{ .Release.Name }}" -o jsonpath="{.items[0].metadata.name}")
-  export CONTAINER_PORT=$(kubectl get pod --namespace {{ .Release.Namespace }} $POD_NAME -o jsonpath="{.spec.containers[0].ports[0].containerPort}")
-  echo "You can now reach the configuration at 127.0.0.1 with port 8433"
-  kubectl --namespace {{ .Release.Namespace }} port-forward $POD_NAME 8433:$CONTAINER_PORT
+  echo "The web management is reachable at {{ $scheme }}://127.0.0.1:{{ $localPort }} while this command runs."
+  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "opc-router.fullname" . }} {{ $localPort }}:{{ .Values.service.port }}
+{{- end }}
+{{- if .Values.webManagement.auth.disable }}
+
+WARNING: The web management has no login (webManagement.auth.disable=true). Whoever can reach it
+can change the router's configuration. Set webManagement.auth.disable=false and an initial user
+to require a login.
+{{- end }}
+{{- if and .Values.project.projectRepo (eq (.Values.project.importMode | default "overwrite") "clear") }}
+
+WARNING: The project is imported with project.importMode=clear. OPC Router 5.5 from 5.5.6007 on, 5.6
+and 5.7 stop at this step and the web management never starts. The chart refuses these versions when
+image.tag names them; with a tag such as latest or one of your own, make sure it is none of them, or
+set project.importMode=overwrite.
 {{- end }}
 {{- else }}
 The chart was successfully installed but the opc-router container won't run:

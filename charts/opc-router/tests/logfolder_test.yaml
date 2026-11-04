@@ -1,0 +1,101 @@
+suite: log folder of the embedded database
+templates:
+  - templates/deployment.yaml
+tests:
+  - it: has no init container with a separate MongoDB and no project
+    asserts:
+      - notExists:
+          path: spec.template.spec.initContainers
+
+  - it: prepares the MongoDB log folder with the router image when the database is embedded
+    set:
+      image:
+        repository: opcrouter/runtime
+        tag: "5.7"
+      mongodb:
+        deploy: false
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].name
+          value: prepare-log-folder
+      - equal:
+          path: spec.template.spec.initContainers[0].image
+          value: opcrouter/runtime:5.7
+      - matchRegex:
+          path: spec.template.spec.initContainers[0].args[0]
+          pattern: mkdir -p /var/log/opcrouter/mongodb && chown mongodb:mongodb /var/log/opcrouter/mongodb
+      - contains:
+          path: spec.template.spec.initContainers[0].volumeMounts
+          content:
+            mountPath: /var/log/opcrouter
+            name: log-volume
+
+  - it: runs the log folder preparation before the project clone
+    set:
+      mongodb:
+        deploy: false
+      project:
+        projectRepo: https://example.com/project.git
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].name
+          value: prepare-log-folder
+      - equal:
+          path: spec.template.spec.initContainers[1].name
+          value: pull-project
+
+  # An upgrade adds this container to a running installation; a policy that admitted the router
+  # must admit it as well.
+  - it: takes the router's resources and security context when no helper resources are set
+    set:
+      mongodb:
+        deploy: false
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+      securityContext:
+        capabilities:
+          drop: [ALL]
+          add: [CHOWN, SETUID, SETGID, FOWNER, DAC_OVERRIDE]
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].resources.limits.memory
+          value: 4Gi
+      - equal:
+          path: spec.template.spec.initContainers[0].securityContext.capabilities.drop
+          value: [ALL]
+
+  - it: takes the helper resources when they are set
+    set:
+      mongodb:
+        deploy: false
+      resources:
+        limits:
+          memory: 4Gi
+      helperResources:
+        limits:
+          memory: 64Mi
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].resources.limits.memory
+          value: 64Mi
+
+  - it: prepares the folder when an upgrade reused values without the switch
+    set:
+      mongodb:
+        deploy: false
+      prepareLogFolder: null
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].name
+          value: prepare-log-folder
+
+  - it: can be switched off
+    set:
+      mongodb:
+        deploy: false
+      prepareLogFolder: false
+    asserts:
+      - notExists:
+          path: spec.template.spec.initContainers

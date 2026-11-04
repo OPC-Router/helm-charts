@@ -7,10 +7,23 @@ metadata:
 spec:
   revisionHistoryLimit: {{ .Values.containerHistoryLimit }}
   replicas: 1
+  {{- if or (not .Values.updateStrategy) (eq (dig "type" "" (.Values.updateStrategy | default dict)) "Recreate") }}
+  {{- include "opc-router.strategySwitchGuard" . }}
+  {{- end }}
+  {{- if .Values.updateStrategy }}
+  strategy:
+    {{- toYaml .Values.updateStrategy | nindent 4 }}
+  {{- else }}
+  # The router mounts two ReadWriteOnce volumes in every mode. A rolling update starts the new pod
+  # next to the old one: on another node it cannot attach them while the old pod holds them, and
+  # with the embedded database it cannot open the database. So the old pod goes first.
+  strategy:
+    type: Recreate
+    rollingUpdate: null
+  {{- end }}
   selector:
     matchLabels:
-      {{- include "opc-router.labels" . | nindent 6 }}
-      {{- include "opc-router.originalSelectorLabels" . | nindent 6 }}
+      {{- include "opc-router.workloadSelectorLabels" . | nindent 6 }}
   template:
     metadata:
       {{- with .Values.podAnnotations }}
@@ -18,17 +31,15 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
-        {{- include "opc-router.labels" . | nindent 8 }}
-        {{- include "opc-router.originalSelectorLabels" . | nindent 8 }}
-        {{- if not .Values.mongodb.deploy }}
-        {{- include "opc-router.selectorLabels" . | nindent 8 }}
-        {{- end }}
+        {{- include "opc-router.podLabels" . | nindent 8 }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "opc-router.serviceAccountName" . }}
+      # Only the project auto-update talks to the Kubernetes API.
+      automountServiceAccountToken: {{ if and .Values.project.projectRepo (not .Values.project.autoUpdate.disable) }}true{{ else }}false{{ end }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
@@ -51,6 +62,11 @@ spec:
             - name: mongodb
               containerPort: 27017
               protocol: TCP
+            {{- end }}
+            {{- range .Values.service.extraPorts }}
+            - name: {{ required "every entry of service.extraPorts needs a name" .name }}
+              containerPort: {{ .targetPort | default (required "every entry of service.extraPorts needs a port" .port) }}
+              protocol: {{ .protocol | default "TCP" }}
             {{- end }}
           # Environment variables for the opcrouter container
           env:
@@ -93,8 +109,17 @@ spec:
           {{- if .Values.project.projectRepo }}
           - name: OR_IMPORT_SOURCE
             value: "/data/project/{{ .Values.project.projectPath }}"
+          {{- $importMode := .Values.project.importMode | default "overwrite" }}
+          {{- if eq $importMode "overwrite" }}
+          - name: OR_IMPORT_OVERWRITE_EXISTING
+            value: "true"
+          {{- else if eq $importMode "clear" }}
+          {{- include "opc-router.importClearGuard" . }}
           - name: OR_IMPORT_ALLOW_CLEAR_CONFIG
             value: "true"
+          {{- else }}
+          {{- fail (printf "project.importMode must be clear or overwrite, not %s" $importMode) }}
+          {{- end }}
           - name: OR_IMPORT_RUNTIME_CONFIGURATION_FILE
             value: "/data/project/{{ .Values.project.configPath }}"
           {{- end }}
@@ -104,10 +129,26 @@ spec:
           {{- end }}
           - name: OR_I_ACCEPT_EULA
             value: {{ .Values.I_do_accept_the_EULA | quote }}
+          {{- $envNames := list }}
+          {{- range .Values.envVars }}
+          {{- $envNames = append $envNames (keys . | first) }}
+          {{- end }}
+          {{- range .Values.extraEnv }}
+          {{- $envNames = append $envNames .name }}
+          {{- end }}
+          {{- if not (has "S6_BEHAVIOUR_IF_STAGE2_FAILS" $envNames) }}
+          # Stop the container when a startup step fails, so Kubernetes restarts it instead of
+          # leaving a running pod that never answers.
+          - name: S6_BEHAVIOUR_IF_STAGE2_FAILS
+            value: "2"
+          {{- end }}
           # Loading environment variables specified in the values file
           {{- range .Values.envVars }}
           - name: "{{ keys . | first }}"
             value: "{{ values . | first }}"
+          {{- end }}
+          {{- with .Values.extraEnv }}
+          {{- toYaml . | nindent 10 }}
           {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
@@ -126,13 +167,20 @@ spec:
           - mountPath: /data/project
             name: project-volume
           {{- end }}
+          {{- with .Values.extraVolumeMounts }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
       {{- if .Values.project.projectRepo }}
         {{- if not .Values.project.autoUpdate.disable }}
         - name: kubernetes-proxy
           image: "{{ .Values.project.autoUpdate.kubectlImage.repository }}:{{ .Values.project.autoUpdate.kubectlImage.tag }}"
           imagePullPolicy: {{ .Values.project.autoUpdate.kubectlImage.pullPolicy }}
-          # Script for setting ssh credentials and cloning the repository onto the volume
-          command: ['sh', '-c', "kubectl proxy;"]
+          # Gives the git-ops container access to the Kubernetes API on localhost:8001
+          args: ["proxy"]
+          {{- with .Values.helperResources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
         - name: git-ops
           image: "{{ .Values.project.gitImage.repository }}:{{ .Values.project.gitImage.tag }}"
           imagePullPolicy: {{ .Values.project.gitImage.pullPolicy }}
@@ -141,6 +189,10 @@ spec:
           args:
           - >-
             {{- include "project.gitops" $ | indent 12}}
+          {{- with .Values.helperResources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           # Volume mount for the project and configuration file
           volumeMounts:
           - mountPath: /data/project
@@ -151,8 +203,58 @@ spec:
             readOnly: true
           {{- end }}
         {{- end }}
-      # Init container for pulling the project files
+      {{- end }}
+      {{- if and (not .Values.mongodb.deploy) (dig "enabled" false (.Values.mongodbLogRotation | default dict)) }}
+        # The embedded database's log is not rotated by the image and grows until the volume is full.
+        - name: mongodb-log-rotation
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["sh", "-c"]
+          args:
+            - |
+              {{- include "opc-router.mongodbLogRotation" . | nindent 14 }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.helperResources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+          - mountPath: /var/log/opcrouter
+            name: log-volume
+      {{- end }}
+      {{- $prepareLogFolder := and (not .Values.mongodb.deploy) (ne .Values.prepareLogFolder false) }}
+      {{- if or $prepareLogFolder .Values.project.projectRepo .Values.extraInitContainers }}
       initContainers:
+      {{- if $prepareLogFolder }}
+      # The embedded database's startup check writes into /var/log/opcrouter/mongodb before the image
+      # creates that folder, so a new, empty log volume next to an existing database fails the start.
+      # An image without a mongodb user has no embedded database and is left untouched.
+      - name: prepare-log-folder
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command: ["sh", "-c"]
+        args:
+          - if id mongodb > /dev/null 2>&1; then mkdir -p /var/log/opcrouter/mongodb && chown mongodb:mongodb /var/log/opcrouter/mongodb; fi
+        # Upgrades add this container to running installations, so it takes the router's security
+        # context and, without helperResources, the router's resources: a policy that admitted the
+        # router admits it too, and an init container does not raise the pod's requests.
+        {{- with .Values.securityContext }}
+        securityContext:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- with (.Values.helperResources | default .Values.resources) }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        volumeMounts:
+        - mountPath: /var/log/opcrouter
+          name: log-volume
+      {{- end }}
+      {{- if .Values.project.projectRepo }}
+      # Init container for pulling the project files
       - name: pull-project
         image: "{{ .Values.project.gitImage.repository }}:{{ .Values.project.gitImage.tag }}"
         imagePullPolicy: {{ .Values.project.gitImage.pullPolicy }}
@@ -161,6 +263,10 @@ spec:
         args:
           - >-
           {{- include "project.clone" $ | indent 10}}
+        {{- with .Values.helperResources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
         # Volume mount for the project and configuration file
         volumeMounts:
         - mountPath: /data/project
@@ -170,6 +276,10 @@ spec:
           name: ssh-volume
           readOnly: true
         {{- end }}
+      {{- end }}
+      {{- with .Values.extraInitContainers }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
       {{- end }}
       # Volume for the project and configuration file
       volumes:
@@ -182,18 +292,19 @@ spec:
       {{- if not .Values.webManagement.https.disable }}
       - name: https-volume
         secret:
-          type: kubernetes.io/tls
           secretName: {{ .Values.webManagement.https.existingTlsSecret | default (printf "%s-%s" (include "opc-router.fullname" $) "tls-secret" | trunc 63 | trimSuffix "-")}}
       {{- end }}
       {{- if (or .Values.project.auth.ssh_key .Values.project.auth.ssh_secret) }}
       - name: ssh-volume
         secret:
-          type: kubernetes.io/ssh-auth
           secretName: {{ .Values.project.auth.ssh_secret | default (printf "%s-%s" (include "opc-router.fullname" $) "ssh-secret" | trunc 63 | trimSuffix "-")}}
       {{- end }}
       {{- if .Values.project.projectRepo }}
       - name: project-volume
         emptyDir: {}
+      {{- end }}
+      {{- with .Values.extraVolumes }}
+      {{- toYaml . | nindent 6 }}
       {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:

@@ -1,0 +1,96 @@
+suite: rotation of the embedded database's log
+templates:
+  - templates/deployment.yaml
+tests:
+  - it: does not rotate by default
+    set:
+      mongodb:
+        deploy: false
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.containers
+          count: 1
+
+  - it: rotates the embedded database's log with the router image
+    set:
+      image:
+        repository: opcrouter/runtime
+        tag: "5.7"
+      mongodb:
+        deploy: false
+      mongodbLogRotation:
+        enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[1].name
+          value: mongodb-log-rotation
+      - equal:
+          path: spec.template.spec.containers[1].image
+          value: opcrouter/runtime:5.7
+      - matchRegex:
+          path: spec.template.spec.containers[1].args[0]
+          pattern: max=\$\(\( 200 \* 1024 \* 1024 \)\)
+      - matchRegex:
+          path: spec.template.spec.containers[1].args[0]
+          pattern: keep=4
+      - matchRegex:
+          path: spec.template.spec.containers[1].args[0]
+          pattern: sleep 600 &
+      - matchRegex:
+          path: spec.template.spec.containers[1].args[0]
+          pattern: db.adminCommand\(\{ logRotate. 1 \}\)
+      - contains:
+          path: spec.template.spec.containers[1].volumeMounts
+          content:
+            mountPath: /var/log/opcrouter
+            name: log-volume
+
+  - it: takes the configured size, count and interval
+    set:
+      mongodb:
+        deploy: false
+      mongodbLogRotation:
+        enabled: true
+        maxSizeMB: 50
+        keepFiles: 10
+        checkIntervalSeconds: 60
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[1].args[0]
+          pattern: max=\$\(\( 50 \* 1024 \* 1024 \)\)
+      - matchRegex:
+          path: spec.template.spec.containers[1].args[0]
+          pattern: keep=10
+      - matchRegex:
+          path: spec.template.spec.containers[1].args[0]
+          pattern: sleep 60 &
+
+  - it: runs with the router's security context and the helper resources
+    set:
+      mongodb:
+        deploy: false
+      mongodbLogRotation:
+        enabled: true
+      securityContext:
+        capabilities:
+          drop: [ALL]
+          add: [CHOWN, SETUID, SETGID, FOWNER, DAC_OVERRIDE]
+      helperResources:
+        limits:
+          memory: 256Mi
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[1].securityContext.capabilities.drop
+          value: [ALL]
+      - equal:
+          path: spec.template.spec.containers[1].resources.limits.memory
+          value: 256Mi
+
+  - it: leaves a separate MongoDB alone
+    set:
+      mongodbLogRotation:
+        enabled: true
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.containers
+          count: 1

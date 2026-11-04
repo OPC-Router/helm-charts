@@ -1,0 +1,10 @@
+# Project loaded from a git repository, with automatic updates
+I_do_accept_the_EULA: true
+project:
+  projectRepo: https://github.com/OPC-Router/helm-sample-project.git
+  projectPath: Sampleproject.rpe
+  configPath: config.yaml
+  autoUpdate:
+    disable: false
+envVars:
+  - Config: "This is a random number: "

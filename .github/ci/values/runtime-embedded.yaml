@@ -1,0 +1,9 @@
+# All-in-one runtime image with its embedded database, no separate MongoDB
+I_do_accept_the_EULA: true
+image:
+  repository: opcrouter/runtime
+mongodb:
+  deploy: false
+claims:
+  inray:
+    capacity: 8Gi
