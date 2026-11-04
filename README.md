@@ -27,7 +27,7 @@
   - [**Installation**](#installation)
   - [**Uninstalling**](#uninstalling)
 - [Upgrading](#upgrading)
-  - [**Upgrading to 1.0.5**](#upgrading-to-105)
+  - [**Upgrading to 1.1.0**](#upgrading-to-110)
   - [**When the MongoDB pod does not start**](#when-the-mongodb-pod-does-not-start)
   - [**Tools that render the chart without the cluster**](#tools-that-render-the-chart-without-the-cluster)
   - [**Rolling back**](#rolling-back)
@@ -119,9 +119,9 @@ password and replica set key, or delete that volume beforehand.
 
 # Upgrading
 
-## **Upgrading to 1.0.5**
+## **Upgrading to 1.1.0**
 
-Chart 1.0.5 keeps what an existing installation relies on: the names of its volumes, its pod selector
+Chart 1.1.0 keeps what an existing installation relies on: the names of its volumes, its pod selector
 and its database. It changes the following:
 - **The default image is OPC Router 5.7** (before: 5.3). A release without an `image.tag` of its own
   moves to 5.7 with this upgrade; read [The move to OPC Router 5.7](#the-move-to-opc-router-57) first.
@@ -163,14 +163,14 @@ system).
 Upgrade with the new defaults and the values you set yourself:
 ```shell
 helm repo update
-helm upgrade my-opcrouter opc-router/opc-router --version 1.0.5 --reset-then-reuse-values
+helm upgrade my-opcrouter opc-router/opc-router --version 1.1.0 --reset-then-reuse-values
 ```
 Instead of `--reset-then-reuse-values` you can pass your complete values file with `-f`. Plain
 `--reuse-values` keeps the defaults of your old chart version, among them the MongoDB image that no
 longer exists (and the moving helper image tags), and still reports success; with it, add the new
 image explicitly:
 ```shell
-helm upgrade my-opcrouter opc-router/opc-router --version 1.0.5 --reuse-values \
+helm upgrade my-opcrouter opc-router/opc-router --version 1.1.0 --reuse-values \
   --set mongodb.image.registry=docker.io \
   --set mongodb.image.repository=bitnamilegacy/mongodb \
   --set mongodb.image.tag=4.4.15
@@ -183,14 +183,14 @@ the message names:
 ```shell
 export MONGODB_ROOT_PASSWORD=$(kubectl get secret my-opcrouter-mongodb -o jsonpath="{.data.mongodb-root-password}" | base64 -d)
 export MONGODB_REPLICA_SET_KEY=$(kubectl get secret my-opcrouter-mongodb -o jsonpath="{.data.mongodb-replica-set-key}" | base64 -d)
-helm upgrade my-opcrouter opc-router/opc-router --version 1.0.5 --reset-then-reuse-values \
+helm upgrade my-opcrouter opc-router/opc-router --version 1.1.0 --reset-then-reuse-values \
   --set mongodb.auth.rootPassword=$MONGODB_ROOT_PASSWORD \
   --set mongodb.auth.replicaSetKey=$MONGODB_REPLICA_SET_KEY
 ```
 
 **A release installed with Helm 4** was applied server-side, and because chart versions up to 1.0.4
 set no update strategy, Kubernetes filled in a rolling update when it created the router's
-Deployment. A server-side apply cannot remove those settings, so 1.0.5 cannot switch the Deployment
+Deployment. A server-side apply cannot remove those settings, so 1.1.0 cannot switch the Deployment
 to `Recreate` (see [Updates and downtime](#updates-and-downtime)) on its own. The chart stops such an
 upgrade before it changes anything, with a message that begins `the Deployment … still has the
 rolling update settings Kubernetes gave it at installation`. Switch the Deployment once with the
@@ -210,7 +210,7 @@ your old chart version, and that replaces a running MongoDB pod with the image t
 (see [Rolling back](#rolling-back)).
 
 Releases installed with chart 1.0.0 or 1.0.1 run OPC Router 5.1 or 5.2, unless they set `image.tag`.
-The upgrade to 1.0.5 moves them to 5.7 as well; set `image.tag` to stay on your version.
+The upgrade to 1.1.0 moves them to 5.7 as well; set `image.tag` to stay on your version.
 
 ## **When the MongoDB pod does not start**
 
@@ -255,8 +255,8 @@ database. If you have to go back, repair it as in
 
 ## **The move to OPC Router 5.7**
 
-Chart 1.0.5 installs OPC Router 5.7 by default, so a release without an `image.tag` of its own moves
-from 5.3 to 5.7 with the upgrade to 1.0.5. OPC Router 5.7 runs on the bundled MongoDB 4.4.15; it
+Chart 1.1.0 installs OPC Router 5.7 by default, so a release without an `image.tag` of its own moves
+from 5.3 to 5.7 with the upgrade to 1.1.0. OPC Router 5.7 runs on the bundled MongoDB 4.4.15; it
 supports MongoDB from 4.2 on and recommends 6.0 or later, which a later chart version will provide.
 Before you upgrade:
 - **Back up first.** Export the project. With the embedded database, the first start of 5.7 migrates
@@ -278,7 +278,7 @@ project:
   importMode: overwrite      # only with a project from a git repository
 ```
 ```shell
-helm upgrade my-opcrouter opc-router/opc-router --version 1.0.5 --reset-then-reuse-values -f my-values.yaml
+helm upgrade my-opcrouter opc-router/opc-router --version 1.1.0 --reset-then-reuse-values -f my-values.yaml
 ```
 # Configuration
 
