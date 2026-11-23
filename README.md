@@ -1,6 +1,6 @@
 <div align="center">
   <a href="https://opc-router.com/?utm_source=GitHub&utm_medium=HelmChart&utm_campaign=OpcRouterChart">
-    <img src="img/opc_router_logo.png" alt="Logo" >
+    <img src="img/opc_router_logo.png" alt="Logo" width="200">
   </a>
     <br />
     <br />
