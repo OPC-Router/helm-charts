@@ -1,3 +1,4 @@
+{{- $tests := .Values.tests | default dict }}
 apiVersion: v1
 kind: Pod
 metadata:
@@ -8,8 +9,19 @@ metadata:
     "helm.sh/hook": test
 spec:
   containers:
-    - name: wget
-      image: busybox
-      command: ['wget']
-      args: ['{{ include "opc-router.fullname" . }}:{{ .Values.service.port }}']
+    - name: connection
+      image: "{{ dig "image" "repository" "busybox" $tests }}:{{ dig "image" "tag" "1.37" $tests }}"
+      imagePullPolicy: {{ dig "image" "pullPolicy" "IfNotPresent" $tests }}
+      command: ["sh", "-c"]
+      args:
+        {{- if .Values.webManagement.https.disable }}
+        # The runtime's health route answers 200 only once the runtime is ready.
+        - wget -q -O - http://{{ include "opc-router.fullname" . }}:{{ .Values.service.port }}/health/runtime/ready
+        {{- else }}
+        - nc -z -w 10 {{ include "opc-router.fullname" . }} {{ .Values.service.port }}
+        {{- end }}
+      {{- with $tests.resources }}
+      resources:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
   restartPolicy: Never

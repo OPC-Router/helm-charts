@@ -1,0 +1,58 @@
+# A managed cluster: an admission policy that rejects containers without resource requests and
+# limits, no permissions for the service account, an internal load balancer with an extra port, a
+# dedicated node pool, and the runtime image with its embedded database
+I_do_accept_the_EULA: true
+image:
+  repository: opcrouter/runtime
+mongodb:
+  deploy: false
+serviceAccount:
+  create: false
+resources:
+  requests:
+    cpu: 250m
+    memory: 3Gi
+  limits:
+    cpu: "2"
+    memory: 4Gi
+helperResources:
+  requests:
+    cpu: 10m
+    memory: 32Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi
+tests:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 16Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+mongodbLogRotation:
+  enabled: true
+service:
+  type: LoadBalancer
+  annotations:
+    service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+  extraPorts:
+    - name: opcua
+      port: 49420
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: agentpool
+              operator: In
+              values:
+                - user
+updateStrategy:
+  type: Recreate
+  rollingUpdate: null
+claims:
+  inray:
+    capacity: 10Gi
+  log:
+    capacity: 6Gi

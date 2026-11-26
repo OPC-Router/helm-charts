@@ -1,0 +1,6 @@
+# Service of type LoadBalancer with provider annotations (internal load balancer example)
+I_do_accept_the_EULA: true
+service:
+  type: LoadBalancer
+  annotations:
+    service.beta.kubernetes.io/azure-load-balancer-internal: "true"

@@ -1,0 +1,33 @@
+suite: connection to the bundled MongoDB
+templates:
+  - templates/deployment.yaml
+release:
+  name: r1
+tests:
+  - it: connects to the single member of the bundled replica set
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OR_DATABASE_CONNECTION_STRING
+            value: mongodb://r1-mongodb-0.r1-mongodb-headless/?directConnection=true
+
+  - it: refuses several MongoDB members, which the router does not support
+    set:
+      mongodb:
+        replicaCount: 2
+    asserts:
+      - failedTemplate:
+          errorPattern: mongodb.replicaCount must be 1
+
+  - it: ignores the member count when the router embeds its database
+    set:
+      mongodb:
+        deploy: false
+        replicaCount: 2
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OR_DATABASE_CONNECTION_STRING
+          any: true

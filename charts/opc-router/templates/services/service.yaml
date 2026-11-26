@@ -19,6 +19,15 @@ spec:
       targetPort: web-management
       protocol: TCP
       name: web-management
+    {{- range .Values.service.extraPorts }}
+    - port: {{ .port }}
+      {{- with .nodePort }}
+      nodePort: {{ . }}
+      {{- end }}
+      targetPort: {{ .name }}
+      protocol: {{ .protocol | default "TCP" }}
+      name: {{ .name }}
+    {{- end }}
   {{- with .Values.service.externalIPs }}
   externalIPs:
     {{- toYaml . | nindent 4 }}
@@ -27,5 +36,5 @@ spec:
   loadBalancerIP: {{ . }}
   {{- end }}
   selector:
-    {{- include "opc-router.labels" . | nindent 4 }}
+    {{- include "opc-router.workloadSelectorLabels" . | nindent 4 }}
 {{- end }}

@@ -1,0 +1,124 @@
+suite: router selector across chart versions
+templates:
+  - templates/deployment.yaml
+  - templates/services/service.yaml
+release:
+  name: r1
+  namespace: ns1
+tests:
+  - it: gives a new release selector labels without chart or app version
+    template: templates/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.selector.matchLabels
+          value:
+            app.kubernetes.io/name: opc-router
+            app.kubernetes.io/instance: r1
+            app.kubernetes.io/component: router
+
+  - it: labels the pods of a new release so that the selector matches them
+    template: templates/deployment.yaml
+    asserts:
+      - isSubset:
+          path: spec.template.metadata.labels
+          content:
+            app.kubernetes.io/name: opc-router
+            app.kubernetes.io/instance: r1
+            app.kubernetes.io/component: router
+
+  - it: selects the router pods with the same labels in the Service
+    template: templates/services/service.yaml
+    asserts:
+      - equal:
+          path: spec.selector
+          value:
+            app.kubernetes.io/name: opc-router
+            app.kubernetes.io/instance: r1
+            app.kubernetes.io/component: router
+
+  - it: keeps the selector of a Deployment created by an earlier chart version
+    template: templates/deployment.yaml
+    kubernetesProvider:
+      scheme:
+        "apps/v1/Deployment":
+          gvr:
+            group: "apps"
+            version: "v1"
+            resource: "deployments"
+          namespaced: true
+      objects:
+        - kind: Deployment
+          apiVersion: apps/v1
+          metadata:
+            name: r1-opc-router
+            namespace: ns1
+          spec:
+            selector:
+              matchLabels:
+                app.kubernetes.io/instance: r1
+                app.kubernetes.io/managed-by: Helm
+                app.kubernetes.io/name: opc-router
+                app.kubernetes.io/version: "5.3"
+                helm.sh/chart: opc-router-1.0.3
+                originForRedundency: redundant-r1-opc-router
+    asserts:
+      - equal:
+          path: spec.selector.matchLabels
+          value:
+            app.kubernetes.io/instance: r1
+            app.kubernetes.io/managed-by: Helm
+            app.kubernetes.io/name: opc-router
+            app.kubernetes.io/version: "5.3"
+            helm.sh/chart: opc-router-1.0.3
+            originForRedundency: redundant-r1-opc-router
+      - isSubset:
+          path: spec.template.metadata.labels
+          content:
+            app.kubernetes.io/version: "5.3"
+            helm.sh/chart: opc-router-1.0.3
+            originForRedundency: redundant-r1-opc-router
+
+  # The Service must follow the kept selector, or it loses its endpoints on the upgrade.
+  - it: selects the pods of an earlier chart version's Deployment in the Service
+    template: templates/services/service.yaml
+    kubernetesProvider:
+      scheme:
+        "apps/v1/Deployment":
+          gvr:
+            group: "apps"
+            version: "v1"
+            resource: "deployments"
+          namespaced: true
+      objects:
+        - kind: Deployment
+          apiVersion: apps/v1
+          metadata:
+            name: r1-opc-router
+            namespace: ns1
+          spec:
+            selector:
+              matchLabels:
+                app.kubernetes.io/instance: r1
+                app.kubernetes.io/name: opc-router
+                helm.sh/chart: opc-router-1.0.3
+                originForRedundency: redundant-r1-opc-router
+    asserts:
+      - equal:
+          path: spec.selector
+          value:
+            app.kubernetes.io/instance: r1
+            app.kubernetes.io/name: opc-router
+            helm.sh/chart: opc-router-1.0.3
+            originForRedundency: redundant-r1-opc-router
+
+  - it: never puts a label key twice on the pod, also with the embedded database
+    template: templates/deployment.yaml
+    set:
+      mongodb:
+        deploy: false
+    asserts:
+      - notExists:
+          path: spec.template.metadata.labels["statefulset.kubernetes.io/pod-name"]
+      - equal:
+          path: spec.template.metadata.labels["app.kubernetes.io/instance"]
+          value: r1

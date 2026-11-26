@@ -1,0 +1,110 @@
+suite: installation notes
+templates:
+  - templates/NOTES.txt
+release:
+  name: r1
+  namespace: ns1
+tests:
+  - it: points a LoadBalancer at the router when it embeds its database
+    set:
+      I_do_accept_the_EULA: true
+      mongodb:
+        deploy: false
+      service:
+        type: LoadBalancer
+    asserts:
+      - matchRegexRaw:
+          pattern: kubectl get svc --namespace ns1 r1-opc-router --template
+      - matchRegexRaw:
+          pattern: echo http://\$SERVICE_IP:8443
+
+  - it: points a LoadBalancer at the router, not at the bundled MongoDB
+    set:
+      I_do_accept_the_EULA: true
+      service:
+        type: LoadBalancer
+    asserts:
+      - notMatchRegexRaw:
+          pattern: mongodb
+      - matchRegexRaw:
+          pattern: kubectl get svc --namespace ns1 r1-opc-router --template
+
+  - it: forwards a local port to the service
+    set:
+      I_do_accept_the_EULA: true
+    asserts:
+      - matchRegexRaw:
+          pattern: port-forward svc/r1-opc-router 8080:8443
+      - matchRegexRaw:
+          pattern: http://127.0.0.1:8080
+
+  - it: uses HTTPS when the web management serves HTTPS
+    set:
+      I_do_accept_the_EULA: true
+      webManagement:
+        https:
+          disable: false
+    asserts:
+      - matchRegexRaw:
+          pattern: port-forward svc/r1-opc-router 8443:8443
+      - matchRegexRaw:
+          pattern: https://127.0.0.1:8443
+
+  - it: warns that the web management has no login
+    set:
+      I_do_accept_the_EULA: true
+    asserts:
+      - matchRegexRaw:
+          pattern: "WARNING: The web management has no login"
+
+  - it: does not warn once the login is on
+    set:
+      I_do_accept_the_EULA: true
+      webManagement:
+        auth:
+          disable: false
+    asserts:
+      - notMatchRegexRaw:
+          pattern: WARNING
+
+  - it: warns that a clear import stops the web management of some versions
+    set:
+      I_do_accept_the_EULA: true
+      image:
+        tag: latest
+      project:
+        projectRepo: https://example.com/project.git
+        importMode: clear
+    asserts:
+      - matchRegexRaw:
+          pattern: "WARNING: The project is imported with project.importMode=clear"
+
+  - it: does not warn about the import by default
+    set:
+      I_do_accept_the_EULA: true
+      webManagement:
+        auth:
+          disable: false
+      project:
+        projectRepo: https://example.com/project.git
+    asserts:
+      - notMatchRegexRaw:
+          pattern: WARNING
+
+  - it: does not warn about the import when an upgrade reused values without the mode
+    set:
+      I_do_accept_the_EULA: true
+      webManagement:
+        auth:
+          disable: false
+      project:
+        projectRepo: https://example.com/project.git
+        importMode: null
+    asserts:
+      - notMatchRegexRaw:
+          pattern: WARNING
+
+  - it: tells that the router does not run without the accepted EULA
+    asserts:
+      - matchRegexRaw:
+          pattern: I_do_accept_the_EULA to "true"

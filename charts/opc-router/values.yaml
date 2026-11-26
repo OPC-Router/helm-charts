@@ -6,7 +6,7 @@ image:
   # Image for the opc router container
   # Has to be either "opcrouter/runtime" for the integrated database
   # or "opcrouter/service", which utilizes the external mongodb
-  # If using an image which uses an integrated mongodb like opcrouter/runtime, 
+  # If using an image which uses an integrated mongodb like opcrouter/runtime,
   # it is required to set 'mongodb.deploy' to 'false' for the integrated mongodb to be used
   repository: opcrouter/service
   pullPolicy: IfNotPresent
@@ -24,6 +24,8 @@ serviceAccount:
   annotations: {}
   # The name of the service account to use.
   # If not set and create is true, a name is generated using the fullname template
+  # The project auto-update's role is bound to the chart's account or to the one named here, never
+  # to the namespace's default account.
   name: ""
 
 podAnnotations: {}
@@ -33,7 +35,7 @@ podSecurityContext: {}
 
 # Add environment variables for the opc router here.
 # These will be able to insert themself into the config file for example.
-# Have to be added to the list in the following format: 
+# Have to be added to the list in the following format:
 #  Key: "Value"
 # Example:
 # envVars: [
@@ -42,14 +44,33 @@ podSecurityContext: {}
 # ]
 envVars: []
 
+# Further environment variables of the router container as Kubernetes EnvVar entries. Unlike
+# envVars they can take a value from a Secret or a ConfigMap, for example the initial user's
+# password (leave webManagement.auth.initialUser.password empty then):
+#   extraEnv:
+#     - name: INITIAL_PASSWORD
+#       valueFrom:
+#         secretKeyRef:
+#           name: opc-router-initial-user
+#           key: password
+# Do not repeat a variable the chart sets from its own values; change that value instead.
+extraEnv: []
+
 mongodb:
   # When true, an external mongodb will be deployed which the opcrouter will use.
   # Required to be true when using the opcrouter/service image, as it doesn't have a integrated database.
   deploy: true
-  # Number of deployed mongodb pods. Should be at 1 except when utilizing a replica twin, then set to 2.
+  # Number of MongoDB pods. Must stay 1: the router supports only a single-member replica set. For
+  # high availability use the router's redundancy mode, not further MongoDB members.
   replicaCount: 1
   architecture: replicaset
   replicaSetName: rs0
+  image:
+    # Bitnami no longer publishes versioned images under docker.io/bitnami. The frozen
+    # bitnamilegacy repository keeps them; 4.4.15 is the newest MongoDB 4.4 build there.
+    registry: docker.io
+    repository: bitnamilegacy/mongodb
+    tag: "4.4.15"
   directoryPerDB: true
   arbiter:
     enabled: false
@@ -64,13 +85,23 @@ mongodb:
     replicaSetKey:
     # If no secret or password is provided, mongodb will autogenerate these.
 
+# Security context of the router container. The image starts as root and switches to its own
+# service users, so it needs user ID 0, the capabilities CHOWN, SETUID, SETGID, FOWNER and
+# DAC_OVERRIDE, and a writable root filesystem. Another user, dropping these capabilities or
+# readOnlyRootFilesystem: true stop the router from starting. OpenShift's default security context
+# constraint does not allow this; the pod needs anyuid or an equivalent (not tested on OpenShift).
+# A context that grants only what the router needs:
+#   securityContext:
+#     capabilities:
+#       drop:
+#         - ALL
+#       add:
+#         - CHOWN
+#         - SETUID
+#         - SETGID
+#         - FOWNER
+#         - DAC_OVERRIDE
 securityContext: {}
-  # capabilities:
-  #   drop:
-  #   - ALL
-  # readOnlyRootFilesystem: true
-  # runAsNonRoot: true
-  # runAsUser: 1000
 
 webManagement:
   https:
@@ -78,20 +109,20 @@ webManagement:
     # Requires either existingTlsSecret or cert and key to be set.
     disable: true
     # Set the TLS certificate used for web management https.
-    cert: 
+    cert:
     # Set the TLS key corrosponding to the TLS certificate.
-    key: 
+    key:
     # Set an existing kubernetes.io/tls secret to be used for web management https.
     # Takes priority over cert and key.
-    existingTlsSecret: 
+    existingTlsSecret:
   auth:
     # If false, enables authentification for the web management.
     disable: true
-    initialUser: 
+    initialUser:
       # Sets the name of the initial user.
-      name: 
+      name:
       # Sets the password of the initial user.
-      password: 
+      password:
 
 service:
   enabled: true
@@ -112,14 +143,25 @@ service:
   # Used by some cloud providers to add external load balancers.
   # If not supported, it is just ignored.
   loadBalancerIP:
-  # Annotations for service. 
+  # Annotations for service.
   # Some cloud providers may need special annotations for their loadbalancers to work.
   annotations: {}
+  # Further ports of the router, opened on the router container and on this service, for example
+  # the OPC UA server of a project or a listener of a plug-in:
+  #   extraPorts:
+  #     - name: opcua          # required; at most 15 lowercase letters, digits and '-'
+  #       port: 49420          # required; the port of the service
+  #       targetPort: 49420    # the port in the container; defaults to port
+  #       protocol: TCP        # defaults to TCP
+  #       nodePort: 31420      # NodePort and LoadBalancer only
+  extraPorts: []
 
 claims:
   log:
-    # Storage capacity of logging volume claim.
-    capacity: "1Gi"
+    # Size of the log volume (/var/log/opcrouter). Empty: an existing claim keeps its size; a new
+    # install gets 6Gi with the embedded database (2 x 1 GB runtime logs, 2 x 1 GB management logs,
+    # 2 GB MongoDB log) and 4Gi with a separate MongoDB.
+    capacity: ""
     # Storage class name of logging volume claim.
     # If left as empty, will use default storage class, when availible.
     storageClassName:
@@ -127,22 +169,24 @@ claims:
     keepAfterUninstall: false
     storageVolume:
       # If true, a new persistant volume is created for the log files using the settings provided here.
-      # When false, dynamic provisioning might still create a volume using the setting specified by the storageClass. 
+      # When false, dynamic provisioning might still create a volume using the setting specified by the storageClass.
       createVolume: false
       # Persistant volume retain policy of logging volume.
       reclaimPolicy: Retain
       # Volume type of logging volume.
       volumeType: local
       # Volume type specific settings.
-      volumeTypeOptions: 
+      volumeTypeOptions:
         path: /var/log/opcrouter
       # Mount options of logging volume.
       mountOptions: []
       # Node affinity settings of logging volume.
       nodeAffinity: {}
   inray:
-    # Storage capacity of license volume claim.
-    capacity: "100M"
+    # Size of the data volume (/data: configuration, license identity and, without a separate
+    # MongoDB, the embedded database). Empty: an existing claim keeps its size; a new install gets
+    # 10Gi with the embedded database and 1Gi with a separate MongoDB.
+    capacity: ""
     # Storage class name of license volume claim.
     # If left as empty, will use default storage class, when availible.
     storageClassName:
@@ -150,14 +194,14 @@ claims:
     keepAfterUninstall: false
     storageVolume:
       # If true, a new persistant volume is created for the license using the settings provided here.
-      # When false, dynamic provisioning might still create a volume using the setting specified by the storageClass. 
+      # When false, dynamic provisioning might still create a volume using the setting specified by the storageClass.
       createVolume: false
       # Persistant volume retain policy of license volume.
       reclaimPolicy: Retain
       # Volume type of license volume.
       volumeType: local
       # Volume type specific settings.
-      volumeTypeOptions: 
+      volumeTypeOptions:
         path: /data
       # Mount options of license volume.
       mountOptions: []
@@ -192,6 +236,60 @@ resources: {}
   #   cpu: 100m
   #   memory: 128Mi
 
+# Resource requests and limits of the helper containers: the project clone, the project
+# auto-update with its kubectl proxy, and the log folder preparation and log rotation of the
+# embedded database. Clusters that reject containers without limits need them set here as well.
+# Left empty, the log folder preparation takes the router's resources.
+helperResources: {}
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 50m
+  #   memory: 64Mi
+
+# With the embedded database (mongodb.deploy=false), create the MongoDB log folder on the log
+# volume before the router starts. Without it, a new log volume next to an existing database makes
+# every start fail.
+prepareLogFolder: true
+
+# Rotation of the embedded database's log (/var/log/opcrouter/mongodb/mongod.log), which otherwise
+# grows until the log volume is full and the database stops. Only with the embedded database
+# (mongodb.deploy=false). A container from the router image checks the log every
+# checkIntervalSeconds, rotates it once it is larger than maxSizeMB and keeps the newest keepFiles
+# rotated files, so the log takes at most about (keepFiles + 1) x maxSizeMB. It reaches the database
+# on localhost without login, as the router image runs it by default.
+mongodbLogRotation:
+  enabled: false
+  maxSizeMB: 200
+  keepFiles: 4
+  checkIntervalSeconds: 600
+
+# Further volumes of the router pod and their mounts in the router container, for example an
+# odbc.ini from a ConfigMap for the ODBC plug-in:
+#   extraVolumes:
+#     - name: odbc
+#       configMap:
+#         name: odbc-ini
+#   extraVolumeMounts:
+#     - name: odbc
+#       mountPath: /etc/odbc.ini
+#       subPath: odbc.ini
+extraVolumes: []
+extraVolumeMounts: []
+
+# Further init containers, run after the chart's own ones. Where a policy demands resource limits,
+# give them their own.
+extraInitContainers: []
+
+# The connection test run by "helm test".
+tests:
+  image:
+    repository: busybox
+    tag: "1.37"
+    pullPolicy: IfNotPresent
+  resources: {}
+
 nodeSelector: {}
 
 tolerations: []
@@ -201,6 +299,16 @@ affinity: {}
 # The size of the history of deployments kept for potential rollbacks.
 containerHistoryLimit: 10
 
+# How the router pod is replaced on an upgrade. Empty means Recreate in every mode: the old pod
+# stops before the new one starts. The router's two volumes are ReadWriteOnce, and a rolling update
+# starts the new pod first: on another node it waits for volumes the old pod still holds (cloud disks
+# such as Azure Disk or EBS), and the rollout stalls. A rolling update is safe only with a separate
+# MongoDB and on a single node, with volumes pinned to one node, or with volumes that are not
+# attached to nodes; there it shortens the interruption:
+#   updateStrategy:
+#     type: RollingUpdate
+updateStrategy: {}
+
 # Switching this to to true represents accepting the terms and conditions of the end user license agreement.
 # If this is false the opc router container won't be able to run.
 # https://www.opc-router.com/terms-of-use-and-eula/
@@ -208,30 +316,39 @@ I_do_accept_the_EULA: false
 
 project:
   # URL to git repository of the opcrouter4 project. Optional. Can be left empty, resulting in no project being loaded.
-  projectRepo: 
-  # Path to the project .rpe file in the repository. Don't begin with '/'. Optional. Can be left out if no projectRepo is provided. 
-  projectPath: 
+  projectRepo:
+  # Path to the project .rpe file in the repository. Don't begin with '/'. Optional. Can be left out if no projectRepo is provided.
+  projectPath:
   # Path to the projects configuration file. Optional. Not providing it results in no configuration file being loaded.
-  configPath: 
-  # Settings for the used git image
+  configPath:
+  # How the project replaces the router's configuration at every start:
+  #   overwrite  imports the project over the existing configuration: what the project contains
+  #              replaces what is there, everything else stays, also what was deleted from the
+  #              project. Needs OPC Router 5.1.5001 or later.
+  #   clear      deletes the configuration first, then imports the project, so the router runs
+  #              exactly the project. Known defect: OPC Router 5.5 from 5.5.6007 on, 5.6 and 5.7 (the
+  #              chart's default image) stop at this step and the web management never starts; the
+  #              chart refuses clear when image.tag names one of them.
+  importMode: overwrite
+  # Settings for the used git image (needs a shell and git)
   gitImage:
     repository: alpine/git
     pullPolicy: IfNotPresent
-    tag: latest
+    tag: v2.47.2
   autoUpdate:
     # If false, the project will be automatically updated when it changes in the repository. Experimental.
     disable: true
     # Interval in seconds the git repository gets fetched to check for updates
     interval: 300
-    # Settings for the used kubectl image
+    # Settings for the used kubectl image. Its entrypoint must be kubectl; the chart passes "proxy".
     kubectlImage:
-      repository: bitnami/kubectl
+      repository: registry.k8s.io/kubectl
       pullPolicy: IfNotPresent
-      tag: latest
+      tag: v1.33.0
   auth:
     # An existing secret containing the ssh-key under the key 'ssh-privatekey'. Optional.
     # Must be in the same namespace as this application. Takes priority over ssh_key.
-    ssh_secret: 
+    ssh_secret:
     # SSH private key for accessing the git repository. Optional.
     # Line breaks must be represented by '\n'
-    ssh_key: 
+    ssh_key:

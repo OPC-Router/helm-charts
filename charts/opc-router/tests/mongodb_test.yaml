@@ -1,0 +1,9 @@
+suite: bundled MongoDB
+templates:
+  - charts/mongodb/templates/replicaset/statefulset.yaml
+tests:
+  - it: uses the Bitnami legacy image, because docker.io/bitnami no longer has versioned tags
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: docker.io/bitnamilegacy/mongodb:4.4.15

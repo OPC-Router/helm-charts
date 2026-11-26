@@ -1,0 +1,210 @@
+suite: switching an existing Deployment to Recreate
+templates:
+  - templates/deployment.yaml
+release:
+  name: r1
+  namespace: ns1
+tests:
+  # A server-side apply cannot remove the rolling update settings the API defaulted at installation.
+  - it: refuses to switch a Deployment applied server-side from the default rolling update
+    kubernetesProvider:
+      scheme: &scheme
+        "apps/v1/Deployment":
+          gvr:
+            group: "apps"
+            version: "v1"
+            resource: "deployments"
+          namespaced: true
+      objects:
+        - kind: Deployment
+          apiVersion: apps/v1
+          metadata:
+            name: r1-opc-router
+            namespace: ns1
+            managedFields:
+              - manager: helm
+                operation: Apply
+                fieldsV1:
+                  "f:spec":
+                    "f:replicas": {}
+                    "f:selector": {}
+          spec:
+            strategy:
+              type: RollingUpdate
+              rollingUpdate:
+                maxSurge: 25%
+                maxUnavailable: 25%
+    asserts:
+      - failedTemplate:
+          errorPattern: "kubectl patch deployment r1-opc-router -n ns1 --type merge"
+
+  - it: refuses an explicit Recreate on a Deployment applied server-side with the default rolling update
+    set:
+      updateStrategy:
+        type: Recreate
+    kubernetesProvider:
+      scheme: *scheme
+      objects:
+        - kind: Deployment
+          apiVersion: apps/v1
+          metadata:
+            name: r1-opc-router
+            namespace: ns1
+            managedFields:
+              - manager: helm
+                operation: Apply
+                fieldsV1:
+                  "f:spec":
+                    "f:replicas": {}
+          spec:
+            strategy:
+              type: RollingUpdate
+              rollingUpdate:
+                maxSurge: 25%
+                maxUnavailable: 25%
+    asserts:
+      - failedTemplate:
+          errorPattern: "kubectl patch deployment r1-opc-router -n ns1 --type merge"
+
+  # Client-side, a Recreate without rollingUpdate: null switches the Deployment too (measured).
+  - it: switches a Deployment applied client-side (Helm 3) to an explicit Recreate
+    set:
+      updateStrategy:
+        type: Recreate
+    kubernetesProvider:
+      scheme: *scheme
+      objects:
+        - kind: Deployment
+          apiVersion: apps/v1
+          metadata:
+            name: r1-opc-router
+            namespace: ns1
+            managedFields:
+              - manager: helm
+                operation: Update
+                fieldsV1:
+                  "f:spec":
+                    "f:replicas": {}
+          spec:
+            strategy:
+              type: RollingUpdate
+              rollingUpdate:
+                maxSurge: 25%
+                maxUnavailable: 25%
+    asserts:
+      - equal:
+          path: spec.strategy
+          value:
+            type: Recreate
+
+  - it: switches a Deployment applied client-side (Helm 3) from the default rolling update
+    kubernetesProvider:
+      scheme: *scheme
+      objects:
+        - kind: Deployment
+          apiVersion: apps/v1
+          metadata:
+            name: r1-opc-router
+            namespace: ns1
+            managedFields:
+              - manager: helm
+                operation: Update
+                fieldsV1:
+                  "f:spec":
+                    "f:replicas": {}
+          spec:
+            strategy:
+              type: RollingUpdate
+              rollingUpdate:
+                maxSurge: 25%
+                maxUnavailable: 25%
+    asserts:
+      - equal:
+          path: spec.strategy.type
+          value: Recreate
+
+  # Settings helm applied itself are removed when the next apply leaves them out.
+  - it: switches a Deployment whose rolling update settings were applied server-side
+    kubernetesProvider:
+      scheme: *scheme
+      objects:
+        - kind: Deployment
+          apiVersion: apps/v1
+          metadata:
+            name: r1-opc-router
+            namespace: ns1
+            managedFields:
+              - manager: helm
+                operation: Apply
+                fieldsV1:
+                  "f:spec":
+                    "f:strategy":
+                      "f:type": {}
+                      "f:rollingUpdate":
+                        "f:maxSurge": {}
+                        "f:maxUnavailable": {}
+          spec:
+            strategy:
+              type: RollingUpdate
+              # Strings: the test's fake cluster cannot copy plain integers.
+              rollingUpdate:
+                maxSurge: "0%"
+                maxUnavailable: "100%"
+    asserts:
+      - equal:
+          path: spec.strategy.type
+          value: Recreate
+
+  - it: keeps a Deployment applied server-side that is already on Recreate
+    kubernetesProvider:
+      scheme: *scheme
+      objects:
+        - kind: Deployment
+          apiVersion: apps/v1
+          metadata:
+            name: r1-opc-router
+            namespace: ns1
+            managedFields:
+              - manager: helm
+                operation: Apply
+                fieldsV1:
+                  "f:spec":
+                    "f:strategy":
+                      "f:type": {}
+          spec:
+            strategy:
+              type: Recreate
+    asserts:
+      - equal:
+          path: spec.strategy.type
+          value: Recreate
+
+  - it: keeps the rolling update of a Deployment applied server-side when asked for one
+    set:
+      updateStrategy:
+        type: RollingUpdate
+    kubernetesProvider:
+      scheme: *scheme
+      objects:
+        - kind: Deployment
+          apiVersion: apps/v1
+          metadata:
+            name: r1-opc-router
+            namespace: ns1
+            managedFields:
+              - manager: helm
+                operation: Apply
+                fieldsV1:
+                  "f:spec":
+                    "f:replicas": {}
+          spec:
+            strategy:
+              type: RollingUpdate
+              rollingUpdate:
+                maxSurge: 25%
+                maxUnavailable: 25%
+    asserts:
+      - equal:
+          path: spec.strategy
+          value:
+            type: RollingUpdate

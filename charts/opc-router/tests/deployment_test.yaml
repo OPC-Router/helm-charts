@@ -1,0 +1,19 @@
+suite: router deployment
+templates:
+  - templates/deployment.yaml
+tests:
+  - it: passes the accepted EULA to the router
+    set:
+      I_do_accept_the_EULA: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OR_I_ACCEPT_EULA
+            value: "true"
+
+  - it: uses the service image with the chart's app version by default
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: opcrouter/service:5.7

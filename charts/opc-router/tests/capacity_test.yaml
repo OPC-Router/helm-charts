@@ -1,0 +1,113 @@
+suite: volume sizes
+templates:
+  - templates/volumes/claims/inrayclaim.yaml
+  - templates/volumes/claims/logclaim.yaml
+  - templates/volumes/inraystorage.yaml
+  - templates/volumes/logstorage.yaml
+release:
+  name: r1
+  namespace: ns1
+tests:
+  - it: sizes a new install with a separate MongoDB for configuration and logs
+    asserts:
+      - template: templates/volumes/claims/inrayclaim.yaml
+        equal:
+          path: spec.resources.requests.storage
+          value: 1Gi
+      - template: templates/volumes/claims/logclaim.yaml
+        equal:
+          path: spec.resources.requests.storage
+          value: 4Gi
+
+  - it: sizes a new install with the embedded database for the database and its log
+    set:
+      mongodb:
+        deploy: false
+    asserts:
+      - template: templates/volumes/claims/inrayclaim.yaml
+        equal:
+          path: spec.resources.requests.storage
+          value: 10Gi
+      - template: templates/volumes/claims/logclaim.yaml
+        equal:
+          path: spec.resources.requests.storage
+          value: 6Gi
+
+  # The API rejects a local volume without node affinity; the chart says so before the install starts.
+  - it: refuses a local data volume without node affinity
+    template: templates/volumes/inraystorage.yaml
+    set:
+      claims:
+        inray:
+          storageVolume:
+            createVolume: true
+    asserts:
+      - failedTemplate:
+          errorPattern: claims.inray.storageVolume.nodeAffinity is required with volumeType local
+
+  - it: refuses a local log volume without node affinity
+    template: templates/volumes/logstorage.yaml
+    set:
+      claims:
+        log:
+          storageVolume:
+            createVolume: true
+    asserts:
+      - failedTemplate:
+          errorPattern: claims.log.storageVolume.nodeAffinity is required with volumeType local
+
+  - it: gives a volume the chart creates the same size as its claim
+    template: templates/volumes/inraystorage.yaml
+    set:
+      mongodb:
+        deploy: false
+      claims:
+        inray:
+          storageVolume:
+            createVolume: true
+            nodeAffinity:
+              required:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: kubernetes.io/hostname
+                        operator: In
+                        values: [node-1]
+    asserts:
+      - equal:
+          path: spec.capacity.storage
+          value: 10Gi
+
+  - it: uses a configured size
+    set:
+      claims:
+        inray:
+          capacity: 20Gi
+    asserts:
+      - template: templates/volumes/claims/inrayclaim.yaml
+        equal:
+          path: spec.resources.requests.storage
+          value: 20Gi
+
+  - it: keeps the size of an existing claim, which cannot shrink and may not be able to grow
+    kubernetesProvider:
+      scheme:
+        "v1/PersistentVolumeClaim":
+          gvr:
+            version: "v1"
+            resource: "persistentvolumeclaims"
+          namespaced: true
+      objects:
+        - kind: PersistentVolumeClaim
+          apiVersion: v1
+          metadata:
+            name: inray-r1-opc-router
+            namespace: ns1
+          spec:
+            resources:
+              requests:
+                storage: 100M
+    asserts:
+      - template: templates/volumes/claims/inrayclaim.yaml
+        equal:
+          path: spec.resources.requests.storage
+          value: 100M

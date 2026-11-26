@@ -1,0 +1,7 @@
+# Bundled MongoDB with authentication (CI-only placeholder values, no secrets)
+I_do_accept_the_EULA: true
+mongodb:
+  auth:
+    enabled: true
+    rootPassword: ci-only-placeholder
+    replicaSetKey: ciOnlyPlaceholderKey

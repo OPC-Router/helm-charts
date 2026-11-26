@@ -28,31 +28,33 @@ Commands to clone the project repo
 {{- end }}
 
 {{/*
-Commands to clone the project repo and edit config to create a redundancy server
+Rotation of the embedded database's log by size. The router image runs mongod with
+--logRotate reopen: the log is renamed first, then logRotate makes mongod open a new file under the
+old name. Until mongod has reopened its log it keeps writing into the renamed file, so the command
+is repeated while the log path is missing.
 */}}
-{{- define "project.redundant.clone" }}
-  {{- include "project.clone" $}}  
-  cat <<EOF > /data/redundancyconfig.yaml
-
-  ---
-  
-  routeroptions:
-    RedundancyMasterHostname: {{ include "opc-router.redundancy.fullname" . }}
-    RedundancyPingInterval: {{ .Values.project.redundancy.pingInterval }}
-    RedundancyReconnectCheckPeriod: {{ .Values.project.redundancy.reconnectCheckPeriod }}
-  EOF
-  {{ with .Values.project.configPath }}
-  if [ "$(tail -n+2 /data/project/{{ . }} | head -n 1)" = "routeroptions:" ]; then
-    tail -n+3 /data/project/{{ . }} >> /data/redundancyconfig.yaml
-  else 
-    tail -n+2 /data/project/{{ . }} >> /data/redundancyconfig.yaml
+{{- define "opc-router.mongodbLogRotation" -}}
+{{- $rotation := .Values.mongodbLogRotation | default dict -}}
+trap 'exit 0' TERM INT
+log=/var/log/opcrouter/mongodb/mongod.log
+max=$(( {{ dig "maxSizeMB" 200 $rotation | int }} * 1024 * 1024 ))
+keep={{ dig "keepFiles" 4 $rotation | int }}
+while true; do
+  if [ -f "$log" ] && [ "$(stat -c %s "$log")" -gt "$max" ]; then
+    mv "$log" "$log.$(date -u +%Y%m%dT%H%M%SZ)"
   fi
-  {{- end }}
+  if [ ! -f "$log" ] && ls "$log".* > /dev/null 2>&1; then
+    mongosh --quiet --port 27017 --eval 'db.adminCommand({ logRotate: 1 })' > /dev/null || echo "mongod did not reopen its log, retrying" >&2
+  fi
+  ls -1t "$log".* 2>/dev/null | tail -n +$((keep + 1)) | xargs -r rm -f
+  sleep {{ dig "checkIntervalSeconds" 600 $rotation | int }} &
+  wait $!
+done
 {{- end }}
 
 {{/*
 Commands to continuously update the project and restart the pod on new version
-*/}} 
+*/}}
 {{- define "project.gitops" }}
 {{- include "project.ssh" $}}
   apk add curl; 
@@ -67,7 +69,7 @@ Commands to continuously update the project and restart the pod on new version
       git fetch;
       if [ \$(git rev-parse HEAD) != \$(git rev-parse @{u}) ]; then
         git pull;
-        curl -XDELETE http://localhost:8001/api/v1/namespaces/{{ .Release.Namespace }}/pods?labelSelector=app.kubernetes.io/name={{ .Chart.Name }};
+        curl -XDELETE "http://localhost:8001/api/v1/namespaces/{{ .Release.Namespace }}/pods?labelSelector=app.kubernetes.io/name={{ include "opc-router.name" . }},app.kubernetes.io/instance={{ .Release.Name }}";
       fi
     done
   EOF
